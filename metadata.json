@@ -1,0 +1,7 @@
+{
+  "name": "Word Warrior (单词大乱斗)",
+  "description": "A gamified English learning platform where students battle through exams using RPG stats like ATK (Vocab), DEF (Grammar), and HP (Reading). Powered by Gemini Live for real-time oral duels.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

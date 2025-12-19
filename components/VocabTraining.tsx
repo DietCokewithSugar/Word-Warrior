@@ -1,31 +1,49 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { BookOpen, RotateCcw, CheckCircle2, ArrowRight, Zap, Target } from 'lucide-react';
-import { MOCK_VOCAB_CARDS } from '../constants.tsx';
+import { CheckCircle2, RotateCcw, Zap, Target, Loader2, ArrowRight } from 'lucide-react';
+import { getBatchWords, getRandomDistractors, markWordProgress, getUserLearningStats, Word, LearningStats } from '../services/databaseService';
+import { useAuth } from '../contexts/AuthContext';
+import confetti from 'canvas-confetti';
 
-interface VocabCardProps {
-  card: typeof MOCK_VOCAB_CARDS[0];
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
-  index: number;
-  total: number;
+// ==========================================
+// TYPES
+// ==========================================
+type Mode = 'learning' | 'quiz' | 'summary' | 'loading';
+
+interface QuizQuestion {
+  word: Word;
+  options: Word[]; // 1 correct + 3 distractors
+  correctOptionId: string;
 }
 
-const VocabCard: React.FC<VocabCardProps> = ({ card, onSwipeLeft, onSwipeRight, index, total }) => {
-  const [showDefinition, setShowDefinition] = useState(false);
+// ==========================================
+// SUB-COMPONENTS
+// ==========================================
+
+// 1. Learning Card Component
+interface LearningCardProps {
+  word: Word;
+  index: number;
+  total: number;
+  onNext: () => void;
+}
+
+const LearningCard: React.FC<LearningCardProps> = ({ word, index, total, onNext }) => {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0]);
-  const color = useTransform(x, [-100, 100], ["#ef4444", "#22c55e"]);
+  const [isRevealed, setIsRevealed] = useState(false);
 
   const handleDragEnd = (_: any, info: any) => {
-    if (info.offset.x > 100) {
-      onSwipeRight();
-    } else if (info.offset.x < -100) {
-      onSwipeLeft();
+    if (Math.abs(info.offset.x) > 100) {
+      onNext();
     }
   };
+
+  // Parse meaning - handle both literal \n and actual newlines
+  const translations = word.translation?.split(/\\n|\n/).filter(t => t.trim()) || [];
+  const primaryTranslation = translations.map(t => t.trim()).join('\n'); // Join all parts for display
 
   return (
     <motion.div
@@ -33,232 +51,315 @@ const VocabCard: React.FC<VocabCardProps> = ({ card, onSwipeLeft, onSwipeRight, 
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
+      onClick={() => setIsRevealed(true)}
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      exit={{ 
-        x: x.get() > 0 ? 500 : (x.get() < 0 ? -500 : 0), 
-        opacity: 0, 
-        scale: 0.5,
-        transition: { duration: 0.4, ease: "easeOut" } 
-      }}
-      className="absolute inset-0 dark:bg-slate-900 bg-white dark:border-slate-800 border-slate-200 rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl flex flex-col items-center justify-between p-8 md:p-12 cursor-grab active:cursor-grabbing group overflow-hidden touch-none"
+      exit={{ scale: 0.9, opacity: 0 }}
+      className="absolute inset-0 dark:bg-slate-900 bg-white dark:border-slate-800 border-slate-200 rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-between p-8 cursor-pointer active:cursor-grabbing group overflow-visible touch-none"
     >
-      <motion.div 
-        style={{ 
-          backgroundColor: color, 
-          opacity: useTransform(x, [-100, 0, 100], [0.15, 0, 0.15]) 
-        }}
-        className="absolute inset-0 pointer-events-none"
-      />
-
-      <div className="w-full flex flex-col items-center gap-6 z-10">
-        <div className="flex gap-2">
-          {Array.from({ length: total }).map((_, i) => (
-            <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === index ? 'bg-indigo-500 w-8 shadow-[0_0_12px_rgba(99,102,241,0.6)]' : 'dark:bg-slate-700 bg-slate-200 w-1.5'}`} />
-          ))}
-        </div>
+      {/* Header: Progress */}
+      <div className="w-full flex justify-between items-center text-slate-400 font-bold text-xs tracking-widest uppercase select-none">
+        <span>Learning Phase</span>
+        <span>{index + 1} / {total}</span>
       </div>
 
-      <div className="w-full flex-1 flex flex-col items-center justify-center space-y-8 select-none">
-        <div className="w-full overflow-hidden px-2">
-          <h2 className="text-[clamp(1.8rem,8vw,5rem)] font-black rpg-font tracking-tight dark:text-white text-slate-900 leading-none whitespace-nowrap text-center">
-            {card.word}
+      {/* Content */}
+      <div className="flex-1 flex flex-col items-center justify-center space-y-8 w-full text-center">
+        <div>
+          <h2 className="text-5xl md:text-6xl font-black rpg-font tracking-tight dark:text-white text-slate-900 mb-2 select-none">
+            {word.word}
           </h2>
+          {word.phonetic && (
+            <p className="text-lg text-slate-500 font-mono">/{word.phonetic}/</p>
+          )}
         </div>
-        
-        <div className="min-h-[160px] flex items-center justify-center w-full px-4">
-          <AnimatePresence mode="wait">
-            {showDefinition ? (
-              <motion.div 
-                key="def"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="text-center space-y-4"
-              >
-                <p className="text-2xl md:text-4xl text-indigo-500 dark:text-indigo-400 font-black tracking-tight">{card.chinese}</p>
-                <p className="dark:text-slate-400 text-slate-500 text-sm md:text-lg italic leading-relaxed max-w-sm mx-auto">
-                  {card.definition}
+
+        <div className={`w-full h-[1px] bg-slate-200 dark:bg-slate-800 max-w-[100px] transition-opacity duration-300 ${isRevealed ? 'opacity-100' : 'opacity-0'}`} />
+
+        <div className="space-y-2 min-h-[100px] flex flex-col justify-center">
+          {!isRevealed ? (
+            <div className="animate-pulse flex flex-col items-center gap-2 text-slate-400">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold">Tap to reveal</span>
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2"
+            >
+              {translations.map((line, i) => (
+                <p key={i} className="text-xl md:text-2xl font-bold text-indigo-500 dark:text-indigo-400 leading-snug">
+                  {line.trim()}
                 </p>
-              </motion.div>
-            ) : (
-              <motion.button 
-                key="btn"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={(e) => {
-                   e.stopPropagation();
-                   setShowDefinition(true);
-                }}
-                className="px-8 py-4 text-[11px] md:text-sm font-black tracking-[0.25em] uppercase dark:text-slate-400 text-slate-500 border-2 dark:border-slate-800 border-slate-200 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 shadow-md"
-              >
-                Reveal Scroll
-              </motion.button>
-            )}
-          </AnimatePresence>
+              ))}
+              {word.definition && (
+                <p className="text-sm text-slate-400 max-w-xs mx-auto italic leading-relaxed line-clamp-3 mt-4">
+                  {word.definition.split(/\\n|\n/)[0]}
+                </p>
+              )}
+            </motion.div>
+          )}
         </div>
       </div>
 
-      <div className="w-full flex justify-between items-center px-4 md:px-8 text-[10px] md:text-xs font-black tracking-[0.2em] dark:text-slate-600 text-slate-400 uppercase pointer-events-none">
-        <div className="flex flex-col items-start gap-2">
-          <span className="text-red-500/80">← Forget</span>
-          <div className="h-[2px] w-12 bg-current opacity-20" />
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="text-emerald-500/80">Learn →</span>
-          <div className="h-[2px] w-12 bg-current opacity-20" />
-        </div>
+      {/* Footer: Hint */}
+      <div className="text-slate-300 dark:text-slate-700 text-[10px] uppercase tracking-widest font-black">
+        Swipe to continue
       </div>
     </motion.div>
   );
 };
+
+// 2. Quiz Card Component
+interface QuizCardProps {
+  question: QuizQuestion;
+  onAnswer: (correct: boolean) => void;
+  questionIndex: number;
+  totalQuestions: number;
+}
+
+const QuizCard: React.FC<QuizCardProps> = ({ question, onAnswer, questionIndex, totalQuestions }) => {
+  const [selectedParams, setSelectedParams] = useState<{ id: string, isCorrect: boolean } | null>(null);
+
+  const handleSelect = (option: Word) => {
+    if (selectedParams) return; // Prevent double selecting
+
+    const isCorrect = option.id === question.correctOptionId;
+    setSelectedParams({ id: option.id, isCorrect });
+
+    if (isCorrect) {
+      confetti({
+        particleCount: 30,
+        spread: 50,
+        origin: { y: 0.7 },
+        colors: ['#10b981', '#34d399']
+      });
+    }
+
+    // Delay before next question
+    setTimeout(() => {
+      onAnswer(isCorrect);
+    }, 1200);
+  };
+
+  return (
+    <div className="w-full max-w-md mx-auto space-y-8">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <span className="text-xs font-black uppercase tracking-widest text-indigo-500">
+          Quiz {questionIndex + 1} / {totalQuestions}
+        </span>
+        <h2 className="text-4xl md:text-5xl font-black rpg-font dark:text-white text-slate-900">
+          {question.word.word}
+        </h2>
+      </div>
+
+      {/* Options */}
+      <div className="grid grid-cols-1 gap-3">
+        {question.options.map((option) => {
+          const isSelected = selectedParams?.id === option.id;
+          const isCorrectOption = option.id === question.correctOptionId;
+          const showCorrectProcess = selectedParams !== null;
+
+          let btnClass = "dark:bg-slate-800 bg-white border-2 dark:border-slate-700 border-slate-200 hover:border-indigo-500 hover:shadow-lg";
+
+          if (showCorrectProcess) {
+            if (isCorrectOption) {
+              btnClass = "bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400";
+            } else if (isSelected && !isCorrectOption) {
+              btnClass = "bg-red-500/10 border-red-500 text-red-600 dark:text-red-400";
+            } else {
+              btnClass = "opacity-50 grayscale";
+            }
+          }
+
+          return (
+            <button
+              key={option.id}
+              onClick={() => handleSelect(option)}
+              disabled={selectedParams !== null}
+              className={`p-5 rounded-2xl text-left font-bold transition-all transform active:scale-[0.98] flex justify-between items-center ${btnClass}`}
+            >
+              <span className="line-clamp-1">{option.translation?.split('\n')[0]}</span>
+              {showCorrectProcess && isCorrectOption && <CheckCircle2 size={18} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
 
 interface VocabTrainingProps {
   onMastered: (word: string) => void;
 }
 
 const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
-  const [phase, setPhase] = useState<'learning' | 'quiz' | 'mastery'>('learning');
-  const [index, setIndex] = useState(0);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [quizAnswered, setQuizAnswered] = useState(false);
-  const [quizFeedback, setQuizFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const { user } = useAuth();
 
-  const nextLearningCard = () => {
-    if (index < MOCK_VOCAB_CARDS.length - 1) {
-      setIndex(prev => prev + 1);
-    } else {
-      setPhase('quiz');
+  // State
+  const [mode, setMode] = useState<Mode>('loading');
+  const [batch, setBatch] = useState<Word[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [score, setScore] = useState(0);
+
+  // Load Batch
+  useEffect(() => {
+    if (user) {
+      loadBatch();
     }
-  };
+  }, [user]);
 
-  const handleQuizAnswer = (answer: string) => {
-    if (quizAnswered) return;
-    const currentCard = MOCK_VOCAB_CARDS[quizIndex];
-    const isCorrect = answer === currentCard.correctAnswer;
-    
-    setQuizAnswered(true);
-    setQuizFeedback(isCorrect ? 'correct' : 'wrong');
+  const loadBatch = async () => {
+    if (!user) return;
+    setMode('loading');
+    console.log('🔄 Loading new batch...');
 
-    if (isCorrect) {
-      onMastered(currentCard.word);
-    }
-
-    setTimeout(() => {
-      setQuizAnswered(false);
-      setQuizFeedback(null);
-      if (quizIndex < MOCK_VOCAB_CARDS.length - 1) {
-        setQuizIndex(prev => prev + 1);
-      } else {
-        setPhase('mastery');
+    try {
+      const words = await getBatchWords(user.id, 10);
+      if (words.length === 0) {
+        // Handle empty state (all words learned)
+        setMode('summary'); // Or a special 'complete' state
+        return;
       }
-    }, 1200);
+      setBatch(words);
+      setCurrentIndex(0);
+      setMode('learning');
+
+      // Pre-generate quiz for this batch
+      generateQuiz(words);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const reset = () => {
-    setIndex(0);
-    setQuizIndex(0);
-    setPhase('learning');
+  const generateQuiz = async (words: Word[]) => {
+    const questions: QuizQuestion[] = [];
+    for (const word of words) {
+      const distractors = await getRandomDistractors(word.id, 3);
+      // Combine and shuffle
+      const options = [...distractors, word].sort(() => Math.random() - 0.5);
+      questions.push({
+        word,
+        options,
+        correctOptionId: word.id
+      });
+    }
+    setQuizQuestions(questions);
   };
 
-  if (phase === 'mastery') {
+  // Handlers
+  const handleLearningNext = () => {
+    if (currentIndex < batch.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      // Finished learning batch, start quiz
+      setCurrentIndex(0);
+      setScore(0);
+      setMode('quiz');
+    }
+  };
+
+  const handleQuizAnswer = async (correct: boolean) => {
+    const currentWord = quizQuestions[currentIndex].word;
+
+    if (correct) {
+      setScore(prev => prev + 1);
+      if (user) {
+        // Mark as learned in DB
+        await markWordProgress(user.id, currentWord.id, true);
+        onMastered(currentWord.word);
+      }
+    } else {
+      // Log incorrect attempt if needed
+      if (user) {
+        await markWordProgress(user.id, currentWord.id, false);
+      }
+    }
+
+    if (currentIndex < quizQuestions.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      setMode('summary');
+    }
+  };
+
+  // Render Logic
+  if (mode === 'loading') {
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center justify-center min-h-[400px] h-[65vh] text-center space-y-8 px-6"
-      >
+      <div className="flex flex-col items-center justify-center min-h-[400px] h-[60vh]">
+        <Loader2 className="animate-spin text-indigo-500 mb-4" size={40} />
+        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Preparing your session...</p>
+      </div>
+    );
+  }
+
+  if (mode === 'learning') {
+    const currentWord = batch[currentIndex];
+    return (
+      <div className="w-full flex flex-col items-center pt-8">
+        <div className="relative w-full max-w-sm md:max-w-md aspect-[3/4.2]">
+          <AnimatePresence mode="wait">
+            <LearningCard
+              key={currentWord.id}
+              word={currentWord}
+              index={currentIndex}
+              total={batch.length}
+              onNext={handleLearningNext}
+            />
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'quiz') {
+    const currentQuestion = quizQuestions[currentIndex];
+    return (
+      <div className="w-full h-full min-h-[500px] flex flex-col items-center justify-center pt-8 px-6">
+        <QuizCard
+          key={currentQuestion.word.id}
+          question={currentQuestion}
+          questionIndex={currentIndex}
+          totalQuestions={quizQuestions.length}
+          onAnswer={handleQuizAnswer}
+        />
+      </div>
+    );
+  }
+
+  if (mode === 'summary') {
+    const percentage = Math.round((score / batch.length) * 100);
+    return (
+      <div className="w-full h-full min-h-[500px] flex flex-col items-center justify-center text-center space-y-8 px-6">
         <div className="relative">
-          <div className="absolute inset-0 bg-indigo-500 blur-[80px] opacity-10 rounded-full animate-pulse" />
-          <div className="relative dark:bg-slate-900 bg-white dark:border-slate-800 border-slate-200 p-12 rounded-full shadow-2xl">
-            <CheckCircle2 size={64} className="text-emerald-500" />
+          <div className="absolute inset-0 bg-indigo-500 blur-[60px] opacity-20 animate-pulse rounded-full" />
+          <div className="relative border-4 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-full p-12 shadow-2xl">
+            <span className="text-6xl font-black text-indigo-500">{percentage}%</span>
           </div>
         </div>
-        <div className="space-y-3">
-          <h3 className="text-3xl md:text-4xl font-black rpg-font uppercase tracking-tight dark:text-white text-slate-900">Trial Conquered</h3>
-          <p className="dark:text-slate-500 text-slate-400 max-w-sm mx-auto text-xs md:text-sm font-bold uppercase tracking-[0.2em] leading-relaxed">
-            Words have been etched into your soul. You are now stronger.
-          </p>
+
+        <div className="space-y-2">
+          <h2 className="text-3xl font-black rpg-font dark:text-white text-slate-900">Session Complete</h2>
+          <p className="text-slate-400 font-bold">You mastered {score} out of {batch.length} words!</p>
         </div>
-        <button 
-          onClick={reset}
-          className="flex items-center gap-4 bg-indigo-600 text-white px-12 py-5 rounded-full font-black uppercase tracking-[0.2em] text-xs hover:bg-indigo-500 transition-all transform active:scale-95 shadow-2xl shadow-indigo-500/30"
+
+        <button
+          onClick={loadBatch}
+          className="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-black uppercase tracking-widest text-xs transition-all transform active:scale-95 shadow-xl shadow-indigo-500/20 flex items-center gap-2"
         >
-          <RotateCcw size={16} /> New Session
+          <RotateCcw size={16} /> Start Next Batch
         </button>
-      </motion.div>
-    );
-  }
-
-  if (phase === 'quiz') {
-    const currentCard = MOCK_VOCAB_CARDS[quizIndex];
-    return (
-      <div className="w-full flex flex-col items-center justify-center max-w-2xl mx-auto space-y-12 pt-10 px-6 pb-40">
-        <div className="text-center space-y-4">
-          <span className="text-[10px] font-black uppercase tracking-[0.5em] text-indigo-500">Final Trial</span>
-          <h2 className="text-5xl md:text-7xl font-black rpg-font dark:text-white text-slate-900">{currentCard.word}</h2>
-          <div className="flex justify-center gap-2">
-             {MOCK_VOCAB_CARDS.map((_, i) => (
-               <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i <= quizIndex ? 'bg-indigo-500 w-6' : 'bg-slate-200 dark:bg-slate-800 w-3'}`} />
-             ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-          {currentCard.options.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => handleQuizAnswer(opt)}
-              disabled={quizAnswered}
-              className={`p-6 rounded-3xl border-2 transition-all text-left font-bold text-sm md:text-base flex justify-between items-center group
-                ${quizAnswered && opt === currentCard.correctAnswer ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600' : 
-                  quizAnswered && opt !== currentCard.correctAnswer && opt === quizFeedback ? 'bg-red-500/10 border-red-500 text-red-600' :
-                  'dark:bg-slate-900 bg-white dark:border-slate-800 border-slate-200 hover:border-indigo-500 hover:shadow-lg'}
-              `}
-            >
-              <span>{opt}</span>
-              <ArrowRight size={16} className={`opacity-0 group-hover:opacity-100 transition-all ${quizAnswered ? 'hidden' : ''}`} />
-              {quizAnswered && opt === currentCard.correctAnswer && <CheckCircle2 size={18} />}
-            </button>
-          ))}
-        </div>
-
-        <AnimatePresence>
-          {quizFeedback && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className={`flex items-center gap-3 px-6 py-3 rounded-full border font-black uppercase tracking-widest text-[10px]
-                ${quizFeedback === 'correct' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500' : 'bg-red-500/10 border-red-500 text-red-500'}
-              `}
-            >
-              {quizFeedback === 'correct' ? <Zap size={14} /> : <Target size={14} />}
-              {quizFeedback === 'correct' ? 'Knowledge Secured! +5 ATK' : 'Echoes of Doubt...'}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     );
   }
 
-  return (
-    <div className="w-full flex flex-col items-center justify-start overflow-visible pt-4 md:pt-10">
-      <div className="relative w-full max-w-[min(90vw,420px)] md:max-w-xl aspect-[3/4.2] flex items-center justify-center mb-32 md:mb-40">
-        <AnimatePresence mode="wait">
-          <VocabCard 
-            key={index}
-            card={MOCK_VOCAB_CARDS[index]}
-            index={index}
-            total={MOCK_VOCAB_CARDS.length}
-            onSwipeRight={nextLearningCard}
-            onSwipeLeft={nextLearningCard}
-          />
-        </AnimatePresence>
-      </div>
-    </div>
-  );
+  return null;
 };
 
 export default VocabTraining;

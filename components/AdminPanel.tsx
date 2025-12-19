@@ -13,7 +13,7 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onUpdateStats }) => {
   const {
-    themeMode, toggleTheme,
+    themeMode, toggleTheme, setThemeMode,
     primaryColor, setPrimaryColor,
     avatar, setAvatar,
     grade, setGrade,
@@ -166,14 +166,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onUpdateStats }) => {
           </div>
 
           {/* Dark Mode Toggle */}
+          {/* Dark Mode Toggle & System Sync */}
           <div className="flex items-center justify-between pt-2">
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">深色模式 (Dark Mode)</span>
-            <button
-              onClick={toggleTheme}
-              className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${themeMode === 'dark' ? getColorClass('bg', 600) : 'bg-slate-200'}`}
-            >
-              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${themeMode === 'dark' ? 'translate-x-6' : ''}`} />
-            </button>
+            <div>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-400 block">深色模式 (Dark Mode)</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                Currently: {themeMode === 'system' ? 'AUTO (System)' : (themeMode === 'dark' ? 'DARK' : 'LIGHT')}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {themeMode !== 'system' && (
+                <button
+                  onClick={() => setThemeMode('system')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                >
+                  跟随系统
+                </button>
+              )}
+
+              <button
+                onClick={toggleTheme}
+                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${themeMode === 'dark' || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? getColorClass('bg', 600) : 'bg-slate-200'}`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${themeMode === 'dark' || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'translate-x-6' : ''}`} />
+              </button>
+            </div>
           </div>
 
         </div>

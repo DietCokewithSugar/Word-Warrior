@@ -302,3 +302,224 @@ export const getUserAchievements = async (userId: string = TEST_USER_ID): Promis
 export const syncStatsToDatabase = async (stats: UserStats, userId: string = TEST_USER_ID) => {
     return await updateUserStats(userId, stats);
 };
+
+// ============================================
+// WORD LEARNING OPERATIONS
+// ============================================
+
+/**
+ * Word interface from database
+ */
+export interface Word {
+    id: string;
+    word: string;
+    phonetic: string | null;
+    definition: string | null;
+    translation: string | null;
+    pos: string | null;
+    collins: number | null;
+    oxford: boolean;
+    tag: string | null;
+    bnc: number | null;
+    frq: number | null;
+    exchange: string | null;
+}
+
+/**
+ * User word progress interface
+ */
+export interface UserWordProgress {
+    id: string;
+    user_id: string;
+    word_id: string;
+    status: 'learning' | 'mastered' | 'reviewing';
+    correct_count: number;
+    incorrect_count: number;
+    last_reviewed_at: string;
+    mastered_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * Learning stats interface
+ */
+export interface LearningStats {
+    total_words_learned: number;
+    words_learned_today: number;
+    total_correct: number;
+    total_incorrect: number;
+    accuracy_percentage: number;
+}
+
+/**
+ * Get next word for user to learn
+ * Uses database function that respects frq order and excludes mastered words
+ */
+export const getNextWord = async (userId: string = TEST_USER_ID): Promise<Word | null> => {
+    console.log('🔧 getNextWord called with userId:', userId);
+
+    const { data, error } = await supabase
+        .rpc('get_next_word_for_user', { p_user_id: userId });
+
+    console.log('🔧 RPC response:', { data, error });
+
+    if (error) {
+        console.error('Error fetching next word:', error);
+        return null;
+    }
+
+    if (!data || data.length === 0) {
+        console.log('No more words to learn!');
+        return null;
+    }
+
+    console.log('✅ Returning word:', data[0]);
+    return data[0] as Word;
+};
+
+/**
+ * Mark word as learned/practiced
+ * Updates progress and marks as mastered after sufficient correct answers
+ */
+export const markWordProgress = async (
+    userId: string = TEST_USER_ID,
+    wordId: string,
+    correct: boolean
+): Promise<UserWordProgress | null> => {
+    const { data, error } = await supabase
+        .rpc('mark_word_progress', {
+            p_user_id: userId,
+            p_word_id: wordId,
+            p_correct: correct
+        });
+
+    if (error) {
+        console.error('Error marking word progress:', error);
+        return null;
+    }
+
+    // Also add to mastered_words table if marked as mastered
+    if (data && data.status === 'mastered') {
+        const wordData = await supabase
+            .from('words')
+            .select('word')
+            .eq('id', wordId)
+            .single();
+
+        if (wordData.data) {
+            await addMasteredWord(userId, wordData.data.word);
+        }
+    }
+
+    return data as UserWordProgress;
+};
+
+/**
+ * Get user's learning statistics
+ */
+export const getUserLearningStats = async (userId: string = TEST_USER_ID): Promise<LearningStats | null> => {
+    const { data, error } = await supabase
+        .rpc('get_user_learning_stats', { p_user_id: userId });
+
+    if (error) {
+        console.error('Error fetching learning stats:', error);
+        return null;
+    }
+
+    if (!data || data.length === 0) {
+        return {
+            total_words_learned: 0,
+            words_learned_today: 0,
+            total_correct: 0,
+            total_incorrect: 0,
+            accuracy_percentage: 0
+        };
+    }
+
+    return data[0] as LearningStats;
+};
+
+/**
+ * Get user's progress on a specific word
+ */
+export const getWordProgress = async (
+    userId: string = TEST_USER_ID,
+    wordId: string
+): Promise<UserWordProgress | null> => {
+    const { data, error } = await supabase
+        .from('user_word_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('word_id', wordId)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') {
+            // No progress found - that's ok
+            return null;
+        }
+        console.error('Error fetching word progress:', error);
+        return null;
+    }
+
+    return data as UserWordProgress;
+};
+
+/**
+ * Search words by prefix (for autocomplete/search features)
+ */
+export const searchWords = async (searchTerm: string, limit: number = 20): Promise<Word[]> => {
+    const { data, error } = await supabase
+        .rpc('search_words', {
+            search_term: searchTerm,
+            limit_count: limit
+        });
+
+    if (error) {
+        console.error('Error searching words:', error);
+        return [];
+    }
+
+    return (data || []) as Word[];
+};
+
+
+/**
+ * Get batch of words for user to learn (default 10)
+ */
+export const getBatchWords = async (userId: string, limit: number = 10): Promise<Word[]> => {
+    console.log(`🔧 getBatchWords called for user ${userId} with limit ${limit}`);
+
+    const { data, error } = await supabase
+        .rpc('get_next_words_batch', {
+            p_user_id: userId,
+            p_limit: limit
+        });
+
+    if (error) {
+        console.error('Error fetching batch words:', error);
+        return [];
+    }
+
+    console.log(`✅ Fetched ${data?.length || 0} words`);
+    return (data || []) as Word[];
+};
+
+/**
+ * Get random distractors for a quiz question
+ */
+export const getRandomDistractors = async (excludeWordId: string, limit: number = 3): Promise<Word[]> => {
+    const { data, error } = await supabase
+        .rpc('get_distractors', {
+            p_exclude_word_id: excludeWordId,
+            p_limit: limit
+        });
+
+    if (error) {
+        console.error('Error fetching distractors:', error);
+        return [];
+    }
+
+    return (data || []) as Word[];
+};

@@ -113,16 +113,28 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
       let newStats = { ...prev, exp: prev.exp + exp };
 
       // Level Up Logic
-      if (newStats.exp >= prev.level * 100) {
-        newStats.exp -= prev.level * 100;
+      const expNeeded = newStats.level * 100;
+      if (newStats.exp >= expNeeded) {
+        newStats.exp -= expNeeded;
         newStats.level += 1;
-        newStats.maxHp += 10;
-        newStats.hp = newStats.maxHp;
+
+        // Proportional Stat Increase based on New Level
+        // Higher level = more stats gained per level up
+        const levelScaler = newStats.level;
+
+        newStats.maxHp += 10 * levelScaler;
+        newStats.hp = newStats.maxHp;     // Full heal on level up
+        newStats.atk += 1 * levelScaler;
+        newStats.def += 1 * levelScaler;
+
+        // Crit gains are smaller but scale slightly
+        // e.g. Level 2: +0.002, Level 10: +0.01
+        newStats.crit = parseFloat((newStats.crit + (0.001 * levelScaler)).toFixed(3));
       }
 
-      // Stat Increase
+      // Stat Increase from Training (Training specific bonuses remain flat or small)
       if (statType) {
-        if (statType === 'crit') newStats.crit += 0.005;
+        if (statType === 'crit') newStats.crit = parseFloat((newStats.crit + 0.001).toFixed(3));
         else (newStats as any)[statType] += 1;
       }
 
@@ -173,7 +185,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
 
               <div className="relative z-10 flex flex-col items-center gap-4">
                 <div className="p-4 rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-lg transition-transform group-hover:scale-110">
-                  {React.cloneElement(mode.icon as React.ReactElement, { size: 32 })}
+                  {React.cloneElement(mode.icon as any, { size: 32 })}
                 </div>
                 <div className="text-center">
                   <h3 className="font-black text-sm md:text-base text-white uppercase tracking-tight mb-1">
@@ -242,7 +254,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'vocab': return <VocabTraining onMastered={(word) => handleGainExp(5, 'atk', word)} />;
+      case 'vocab': return <VocabTraining onMastered={(word) => handleGainExp(1, 'atk', word)} />;
       case 'scholar': return renderScholarPath();
       case 'leaderboard': return <div className="pb-32"><Leaderboard /></div>;
       case 'profile': return renderProfile();
@@ -255,7 +267,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
       case 'pvp_chant':
         return <div className="pb-32"><BattleArena mode={activeTab} playerStats={stats} onVictory={() => setActiveTab('vocab')} onDefeat={() => setActiveTab('vocab')} /></div>;
       case 'admin': return <AdminPanel onUpdateStats={setStats} />;
-      default: return <VocabTraining onMastered={(word) => handleGainExp(5, 'atk')} />;
+      default: return <VocabTraining onMastered={(word) => handleGainExp(1, 'atk')} />;
     }
   };
 

@@ -44,7 +44,7 @@ interface AuthenticatedAppProps {
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
   const { signOut, user } = useAuth();
-  const { themeMode, toggleTheme, getColorClass, primaryColor } = useTheme(); // Use Theme Context
+  const { themeMode, toggleTheme, isDarkMode, getColorClass, primaryColor } = useTheme(); // Use Theme Context
 
   const [stats, setStats] = useState<UserStats>(() => {
     const saved = localStorage.getItem(`ww_stats_${userId}`);
@@ -252,7 +252,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
             onClick={() => toggleTheme()}
             className="p-2 rounded-full dark:bg-slate-900 bg-slate-100 border dark:border-slate-800 border-slate-200 shadow-sm text-slate-600 dark:text-slate-400"
           >
-            {themeMode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </div>
       </header>

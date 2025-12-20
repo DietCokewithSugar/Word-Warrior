@@ -37,24 +37,24 @@ export const PVP_MODES = [
     id: 'pvp_blitz',
     name: '词汇闪击战',
     description: '拼手速！英选汉，结算伤害 ATK * 1.5。',
-    icon: <Zap size={24} className="text-yellow-400" />,
-    color: 'from-yellow-500/10 to-orange-500/10 border-yellow-500/20',
+    icon: <Zap size={24} className="text-white" />,
+    color: 'from-yellow-500/80 to-orange-500/80 border-yellow-500/50',
     mechanic: 'Speed-based Burst'
   },
   {
     id: 'pvp_tactics',
     name: '语法阵地战',
     description: '拼正确率！DEF 抵挡伤害，免疫暴击。',
-    icon: <ShieldCheck size={24} className="text-cyan-400" />,
-    color: 'from-cyan-500/10 to-blue-500/10 border-cyan-500/20',
+    icon: <ShieldCheck size={24} className="text-white" />,
+    color: 'from-cyan-500/80 to-blue-500/80 border-cyan-500/50',
     mechanic: 'Defensive Strategy'
   },
   {
     id: 'pvp_chant',
     name: '咏唱对决',
     description: '中译英口译，Gemini 实时分析触发秒杀。',
-    icon: <Flame size={24} className="text-red-400" />,
-    color: 'from-red-500/10 to-purple-500/10 border-red-500/20',
+    icon: <Flame size={24} className="text-white" />,
+    color: 'from-red-500/80 to-purple-500/80 border-red-500/50',
     mechanic: 'Real-time Translation'
   }
 ];
@@ -97,7 +97,7 @@ export const ACHIEVEMENTS = [
     bg: 'bg-amber-500/10 border-amber-500',
     condition: (stats: any) => stats.masteredWordsCount >= 1000
   },
-  
+
   // Login/Consistency
   {
     id: 'streak_3',

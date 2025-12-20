@@ -89,3 +89,20 @@ export interface Achievement {
   achievement_id: string;
   unlocked_at: string;
 }
+
+export interface ReadingQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+}
+
+export interface ReadingMaterial {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  difficulty: '小学' | '初中' | '高中';
+  questions: ReadingQuestion[];
+}

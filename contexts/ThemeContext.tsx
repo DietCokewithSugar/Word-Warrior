@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient';
+import { useAuth } from './AuthContext';
 
 export type ThemeColor = 'indigo' | 'blue' | 'cyan' | 'teal' | 'emerald' | 'green' | 'lime' | 'amber' | 'orange' | 'red' | 'fuchsia' | 'violet' | 'purple' | 'pink' | 'rose';
 
@@ -44,6 +46,15 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    // Attempt to access auth context safely (in case ThemeProvider is used outside AuthProvider, though not in this app)
+    let user: any = null;
+    try {
+        const auth = useAuth();
+        user = auth.user;
+    } catch (e) {
+        // Ignore error if AuthProvider is missing
+    }
+
     // Support 'system' mode, defaulting to 'system' effectively
     const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
         return (localStorage.getItem('ww_theme_mode') as 'light' | 'dark' | 'system') || 'system';
@@ -64,6 +75,72 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const saved = localStorage.getItem('ww_user_grade');
         return saved ? parseInt(saved) : 1;
     });
+
+    // Sync from Cloud (Pull)
+    useEffect(() => {
+        if (!user) return;
+
+        const syncSettings = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('user_settings')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (data) {
+                    // Update local state if different
+                    if (data.theme_mode && ['light', 'dark', 'system'].includes(data.theme_mode)) {
+                        setThemeMode(data.theme_mode as any);
+                    }
+                    if (data.theme_color) {
+                        setPrimaryColor(data.theme_color as ThemeColor);
+                    }
+                } else if (error && error.code === 'PGRST116') {
+                    // No settings found, create default with current local settings
+                    await supabase
+                        .from('user_settings')
+                        .insert({
+                            user_id: user.id,
+                            theme_mode: themeMode,
+                            theme_color: primaryColor,
+                        });
+                }
+            } catch (err) {
+                console.error('Error syncing user settings:', err);
+            }
+        };
+
+        syncSettings();
+    }, [user?.id]); // Only re-run if user changes
+
+    // Sync to Cloud (Push)
+    // Use a ref to skip the initial effect run if needed, but since we want to sync changes, 
+    // and the "Pull" updates state which triggers this "Push", it just ensures consistency.
+    useEffect(() => {
+        if (!user) return;
+
+        const pushSettings = async () => {
+            try {
+                const { error } = await supabase
+                    .from('user_settings')
+                    .upsert({
+                        user_id: user.id,
+                        theme_mode: themeMode,
+                        theme_color: primaryColor,
+                        updated_at: new Date().toISOString()
+                    });
+
+                if (error) throw error;
+            } catch (err) {
+                console.error('Error saving user settings:', err);
+            }
+        };
+
+        // Debounce could be added here if rapid changes are expected
+        pushSettings();
+
+    }, [themeMode, primaryColor, user?.id]);
 
     useEffect(() => {
         localStorage.setItem('ww_theme_mode', themeMode);

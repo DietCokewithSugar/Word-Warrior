@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sun, Moon, Zap, Trophy, Shield, User, ChevronRight, LayoutGrid, Star, Flame, Target, BookOpen, Swords, Mic2, Headphones, PenTool, ShieldCheck, LogOut, ShoppingBag } from 'lucide-react';
+import { X, Zap, Trophy, Shield, User, ChevronRight, LayoutGrid, Star, Flame, Target, BookOpen, Swords, Mic2, Headphones, PenTool, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { INITIAL_STATS, NAVIGATION, TRAINING_MODES, PVP_MODES } from './constants.tsx';
 import { UserStats, Rank } from './types';
 import { getUserStats, updateUserStats, addMasteredWord } from './services/databaseService';
@@ -48,8 +48,8 @@ interface AuthenticatedAppProps {
 }
 
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
-  const { signOut, user } = useAuth();
-  const { themeMode, toggleTheme, isDarkMode, getColorClass, primaryColor } = useTheme(); // Use Theme Context
+  const { user } = useAuth();
+  const { themeMode, getColorClass, primaryColor } = useTheme(); // Use Theme Context
 
   const [stats, setStats] = useState<UserStats>(() => {
     const saved = localStorage.getItem(`ww_stats_${userId}`);
@@ -275,27 +275,7 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
   return (
     <div className="h-screen flex flex-col transition-colors duration-500 overflow-hidden dark:bg-[#020617] bg-slate-50">
       {/* Mini Header */}
-      <header className="px-6 py-4 flex justify-between items-center border-b dark:border-slate-900 border-slate-200 bg-white/5 dark:bg-black/5 backdrop-blur-md shrink-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 ${getColorClass('bg', 600)} rounded-lg flex items-center justify-center font-black text-white text-xs`}>W</div>
-          <span className="rpg-font font-black tracking-widest text-xs uppercase dark:text-white text-slate-900">Word Warrior</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => signOut()}
-            className="p-2 rounded-full dark:bg-slate-900 bg-slate-100 border dark:border-slate-800 border-slate-200 shadow-sm text-slate-600 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-            title="登出"
-          >
-            <LogOut size={14} />
-          </button>
-          <button
-            onClick={() => toggleTheme()}
-            className="p-2 rounded-full dark:bg-slate-900 bg-slate-100 border dark:border-slate-800 border-slate-200 shadow-sm text-slate-600 dark:text-slate-400"
-          >
-            {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-        </div>
-      </header>
+
 
       {/* Main Content Area */}
       <main className={`flex-1 overflow-y-auto px-4 custom-scrollbar relative transition-all duration-300 ${isArenaMenuOpen ? 'blur-sm scale-95 opacity-80 pointer-events-none select-none' : ''}`}>

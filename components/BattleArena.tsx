@@ -48,6 +48,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
   const [searchingTime, setSearchingTime] = useState(0);
   const [isGameConnected, setIsGameConnected] = useState(false); // New state to block interaction
   const [matchDetails, setMatchDetails] = useState<any>(null); // Store score breakdown
+  const [isBattleBtnPressed, setIsBattleBtnPressed] = useState(false);
 
   // State Refs for Subscription Callbacks (Avoid Stale Closures)
   const stateRef = useRef({

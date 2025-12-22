@@ -134,24 +134,24 @@ const MatchHistory: React.FC<MatchHistoryProps> = ({ userId }) => {
                             </div>
 
                             {/* Middle: Score */}
-                            <div className="flex flex-col items-center">
-                                <span className="text-lg font-black italic ww-ink tabular-nums">{match.score}</span>
-                                <div className="flex flex-col items-center mt-1">
+                            <div className="flex flex-col items-center justify-center">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-sm font-black ww-ink tabular-nums">
+                                        {/* Display Start Score */}
+                                        {match.startRankPoints !== undefined ? match.startRankPoints : 500}
+                                    </span>
                                     {match.scoreChange !== undefined && (
                                         <span
-                                            className="text-[10px] font-black tabular-nums"
+                                            className="text-sm font-black tabular-nums relative top-[1px]"
                                             style={{
-                                                color:
-                                                    match.scoreChange > 0 || (match.scoreChange === 0 && match.result !== 'loss')
-                                                        ? 'rgba(16,185,129,0.95)'
-                                                        : 'rgba(239,68,68,0.95)'
+                                                color: match.scoreChange >= 0
+                                                    ? 'rgba(16,185,129,0.95)' // Green
+                                                    : 'rgba(239,68,68,0.95)'  // Red
                                             }}
                                         >
-                                            {match.scoreChange > 0 ? '+' : (match.scoreChange === 0 && match.result === 'loss' ? '-' : (match.scoreChange === 0 ? '+' : ''))}{Math.abs(match.scoreChange)}
+                                            {/* Explicitly show + for positive/zero, - comes naturally from negative numbers */}
+                                            {match.scoreChange >= 0 ? '+' : ''}{match.scoreChange}
                                         </span>
-                                    )}
-                                    {match.startRankPoints !== undefined && (
-                                        <span className="text-[9px] ww-muted font-mono tabular-nums">起始 {match.startRankPoints}</span>
                                     )}
                                 </div>
                             </div>

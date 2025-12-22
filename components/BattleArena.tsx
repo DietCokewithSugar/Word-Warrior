@@ -133,10 +133,10 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
 
 
     // Timer for UI only - Modified to trigger AI
-    // Timer for UI only - Modified to trigger AI
     const timer = setInterval(() => {
       setSearchingTime(t => {
-        if (t >= 0) {
+        // Wait 10 seconds before triggering AI
+        if (t >= 10) {
           clearInterval(timer); // Stop counting
           // Clear polling interval if exists
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
@@ -296,13 +296,16 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
     skinColor: '#cccccc',
     hairColor: '#000000',
     armorId: 'default',
-    weaponId: 'default'
+    weaponId: 'default',
+    modelColor: 'blue' // Added default
   });
 
   // Helper: Generate Random Appearance
   const generateRandomAppearance = () => {
     const skins = ['#f5d0b0', '#e0ac69', '#8d5524', '#523318', '#ffdbac'];
     const hairs = ['#000000', '#4a3b2a', '#e6cea0', '#a52a2a', '#ffffff', '#666666'];
+    const colors = ['blue', 'red', 'yellow', 'purple', 'black']; // Randomize tint
+
     // Filter out weapons/armor from SHOP_ITEMS
     /* 
        We can import SHOP_ITEMS but we need to ensure circular deps are fine.
@@ -315,7 +318,8 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
       skinColor: skins[Math.floor(Math.random() * skins.length)],
       hairColor: hairs[Math.floor(Math.random() * hairs.length)],
       armorId: armors[Math.floor(Math.random() * armors.length)],
-      weaponId: weapons[Math.floor(Math.random() * weapons.length)]
+      weaponId: weapons[Math.floor(Math.random() * weapons.length)],
+      modelColor: colors[Math.floor(Math.random() * colors.length)]
     };
   };
 
@@ -353,8 +357,6 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
     console.log('🤖 Starting AI Match...');
     await cancelSearchImpl(true);
 
-    await cancelSearchImpl(true);
-
     let mockQuestions;
     if (mode === 'pvp_tactics') mockQuestions = MOCK_GRAMMAR_QUESTIONS;
     else mockQuestions = MOCK_VOCAB_CARDS;
@@ -365,7 +367,11 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
       .slice(0, 5); // Take 5 questions for quick match
 
     setQuestions(selectedQuestions);
-    setOpponentName('AI Trainer');
+
+    // Random AI Name
+    const aiNames = ['Word Master', 'Vocab Bot', 'Grammar Guardian', 'Syntax Sage', 'Lexicon Legend', 'Word Warrior AI'];
+    setOpponentName(aiNames[Math.floor(Math.random() * aiNames.length)]);
+
     setRoomId('local_ai_' + Date.now());
     setMyRole('player1');
     setPvpState('matched');
@@ -948,7 +954,8 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
             skinColor: warriorState.appearance.skinColor,
             hairColor: warriorState.appearance.hairColor,
             armorId: warriorState.equipped.armor || 'default',
-            weaponId: warriorState.equipped.weapon || 'default'
+            weaponId: warriorState.equipped.weapon || 'default',
+            modelColor: warriorState.appearance.modelColor
           }}
           enemyIds={enemyAppearance}
           combatEvent={combatEvent}

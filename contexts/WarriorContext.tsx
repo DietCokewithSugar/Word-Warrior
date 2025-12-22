@@ -16,8 +16,10 @@ const DEFAULT_STATE: WarriorState = {
         skinColor: '#f5d0b0',
         hairColor: '#4a3b2a',
         hairStyle: 'default',
-        eyeColor: '#000000'
-    }
+        eyeColor: '#000000',
+        modelColor: 'blue' // Added for full body tint
+    },
+    unlockedColors: ['blue'], // Default unlocked color
 };
 
 interface WarriorContextType {
@@ -27,6 +29,7 @@ interface WarriorContextType {
     equipItem: (type: 'armor' | 'weapon', itemId: string) => void;
     updateAppearance: (updates: Partial<WarriorState['appearance']>) => void;
     getItemDetails: (itemId: string) => ShopItem | undefined;
+    unlockColor: (colorId: string) => boolean;
 }
 
 const WarriorContext = createContext<WarriorContextType | undefined>(undefined);
@@ -45,8 +48,17 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                // Merge with default to ensure new fields (if schema changes) exist
-                setState({ ...DEFAULT_STATE, ...parsed });
+                // Merge with default to ensure new fields (if schema changes) exist. 
+                // Deep merge appearance to avoid overwriting new sub-fields (like modelColor) with old object.
+                setState({
+                    ...DEFAULT_STATE,
+                    ...parsed,
+                    appearance: {
+                        ...DEFAULT_STATE.appearance,
+                        ...(parsed.appearance || {})
+                    },
+                    unlockedColors: parsed.unlockedColors || DEFAULT_STATE.unlockedColors
+                });
             } catch (e) {
                 console.error("Failed to parse warrior state", e);
             }
@@ -98,10 +110,24 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
     };
 
+    const unlockColor = (colorId: string): boolean => {
+        if (state.unlockedColors.includes(colorId)) return true; // Already unlocked
+
+        if (state.gold >= 100) {
+            setState(prev => ({
+                ...prev,
+                gold: prev.gold - 100,
+                unlockedColors: [...prev.unlockedColors, colorId]
+            }));
+            return true;
+        }
+        return false;
+    };
+
     const getItemDetails = (itemId: string) => SHOP_ITEMS.find(i => i.id === itemId);
 
     return (
-        <WarriorContext.Provider value={{ state, addGold, buyItem, equipItem, updateAppearance, getItemDetails }}>
+        <WarriorContext.Provider value={{ state, addGold, buyItem, equipItem, updateAppearance, getItemDetails, unlockColor }}>
             {children}
         </WarriorContext.Provider>
     );

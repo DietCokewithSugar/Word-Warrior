@@ -8,9 +8,10 @@ interface StatsPanelProps {
   stats: UserStats;
   username?: string;
   onShopClick?: () => void;
+  onCustomClick?: () => void;
 }
 
-const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick }) => {
+const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick, onCustomClick }) => {
   const { getColorClass, avatar } = useTheme();
 
   const StatRow = ({
@@ -75,27 +76,48 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick })
 
       {/* Shop Button (Big Entry) */}
       {onShopClick && (
-        <button
-          onClick={onShopClick}
-          className="w-full relative overflow-hidden group rounded-2xl p-4 transition-all active:scale-[0.98] border-2 border-[color:var(--ww-stroke)]"
-          style={{ background: 'var(--ww-surface-0)' }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-rose-400/20 opacity-50 group-hover:opacity-100 transition-opacity" />
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center shadow-lg border-2 border-[color:var(--ww-stroke)]">
-                <ShoppingBag size={24} className="text-white" />
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            onClick={onShopClick}
+            className="col-span-2 relative overflow-hidden group rounded-2xl p-4 transition-all active:scale-[0.98] border-2 border-[color:var(--ww-stroke)]"
+            style={{ background: 'var(--ww-surface-0)' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-rose-400/20 opacity-50 group-hover:opacity-100 transition-opacity" />
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center shadow-lg border-2 border-[color:var(--ww-stroke)]">
+                  <ShoppingBag size={24} className="text-white" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-black ww-ink">商店</div>
+                  <div className="text-[10px] ww-muted font-bold uppercase tracking-widest">Upgrade Gear</div>
+                </div>
               </div>
-              <div className="text-left">
-                <div className="text-sm font-black ww-ink">商店</div>
-                <div className="text-[10px] ww-muted font-bold uppercase tracking-widest">Upgrade your gear</div>
+              <div className="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center group-hover:translate-x-1 transition-transform border border-[color:var(--ww-stroke-soft)]">
+                <ChevronRight size={16} className="text-[color:var(--ww-stroke)]" />
               </div>
             </div>
-            <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center group-hover:translate-x-1 transition-transform border border-[color:var(--ww-stroke-soft)]">
-              <ChevronRight size={20} className="text-[color:var(--ww-stroke)]" />
+          </button>
+
+          {/* Customizer Button (Added) */}
+          <button
+            onClick={onCustomClick}
+            className="col-span-2 relative overflow-hidden group rounded-2xl p-3 transition-all active:scale-[0.98] border-2 border-[color:var(--ww-stroke-soft)] hover:border-[color:var(--ww-stroke)] bg-[color:var(--ww-surface-soft)]"
+          >
+            <div className="relative flex items-center justify-between px-2">
+              <div className="flex items-center gap-3">
+                {/* Mini Icon */}
+                <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shadow-md border border-indigo-400">
+                  <Swords size={16} className="text-white" />
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-black ww-ink">外观定制</div>
+                  <div className="text-[9px] ww-muted font-bold uppercase tracking-widest">Customize Look</div>
+                </div>
+              </div>
             </div>
-          </div>
-        </button>
+          </button>
+        </div>
       )}
     </div>
   );

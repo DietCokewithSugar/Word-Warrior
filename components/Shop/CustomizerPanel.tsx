@@ -1,6 +1,6 @@
-
 import React from 'react';
-import { Palette, User } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Palette, X, Check, Lock, Coins } from 'lucide-react';
 import { useWarrior } from '../../contexts/WarriorContext';
 import WarriorPreview from '../Warrior/WarriorPreview';
 
@@ -8,93 +8,147 @@ interface CustomizerPanelProps {
     onClose: () => void;
 }
 
-const COLORS = {
-    skin: ['#f5d0b0', '#e0ac69', '#8d5524', '#523318', '#ffdbac'],
-    hair: ['#000000', '#4a3b2a', '#e6cea0', '#a52a2a', '#ffffff', '#666666'],
-    eyes: ['#000000', '#634e34', '#2e536f', '#3d6e3d', '#763c3c']
-};
-
-const HAIR_STYLES = ['default', 'messy', 'topknot', 'bald'];
+const MODEL_COLORS = [
+    { id: 'blue', color: '#60a5fa', label: '经典蓝' },
+    { id: 'red', color: '#f87171', label: '赤红' },
+    { id: 'yellow', color: '#facc15', label: '金黄' },
+    { id: 'purple', color: '#c084fc', label: '神秘紫' },
+    { id: 'black', color: '#334155', label: '暗影黑' },
+];
 
 const CustomizerPanel: React.FC<CustomizerPanelProps> = ({ onClose }) => {
-    const { state, updateAppearance } = useWarrior();
+    const { state, updateAppearance, unlockColor } = useWarrior();
 
-    const ColorPicker = ({ label, options, current, onChange }: any) => (
-        <div className="space-y-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</span>
-            <div className="flex flex-wrap gap-2">
-                {options.map((c: string) => (
-                    <button
-                        key={c}
-                        onClick={() => onChange(c)}
-                        className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${current === c ? 'border-white ring-2 ring-indigo-500 scale-110' : 'border-transparent'}`}
-                        style={{ backgroundColor: c }}
-                    />
-                ))}
-            </div>
-        </div>
-    );
+    const handleColorSelect = (colorId: string) => {
+        if (state.unlockedColors.includes(colorId)) {
+            updateAppearance({ modelColor: colorId } as any);
+        } else {
+            // Attempt to unlock
+            if (unlockColor(colorId)) {
+                // If successful auto-equip
+                updateAppearance({ modelColor: colorId } as any);
+            } else {
+                // Shake or show error (optional, for now simple logic)
+                alert("金币不足！需要 100 金币解锁。"); // Simple fallback, ideally a toast
+            }
+        }
+    };
 
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-lg space-y-6 flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-1/2 h-[300px] border border-slate-700 rounded-2xl bg-black/20 relative">
-                <WarriorPreview
-                    skinColor={state.appearance.skinColor}
-                    hairColor={state.appearance.hairColor}
-                    armorId={state.equipped.armor || 'default'}
-                    weaponId={state.equipped.weapon || 'default'}
-                />
-            </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="w-full max-w-4xl max-h-[85vh] ww-surface ww-modal rounded-3xl overflow-hidden flex flex-col shadow-2xl"
+            >
+                {/* Header */}
+                <div className="p-6 ww-divider flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <Palette style={{ color: 'var(--ww-stroke)' }} size={24} />
+                        <div>
+                            <h2 className="text-xl font-black uppercase tracking-widest ww-ink">外观定制</h2>
+                            <p className="text-[10px] ww-muted font-bold uppercase tracking-widest">Customize Your Look</p>
+                        </div>
+                    </div>
 
-            <div className="w-full md:w-1/2 space-y-6">
-                <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
-                        <Palette size={16} className="text-indigo-500" />
-                        外观定制
-                    </h3>
+                    <div className="flex items-center gap-4">
+                        {/* Gold Display */}
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 border border-amber-300">
+                            <Coins size={16} className="text-amber-600" />
+                            <span className="text-sm font-black text-amber-800 tabular-nums">{state.gold}</span>
+                        </div>
+                        <button onClick={onClose} className="p-2 rounded-full transition-colors ww-btn ww-btn--ink" aria-label="Close customizer">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
-                <div className="space-y-6">
-                    <ColorPicker
-                        label="Skin Tone"
-                        options={COLORS.skin}
-                        current={state.appearance.skinColor}
-                        onChange={(c: string) => updateAppearance({ skinColor: c })}
-                    />
+                <div className="flex flex-col md:flex-row p-6 gap-8 overflow-hidden h-full">
+                    {/* Preview Area */}
+                    <div className="w-full md:w-1/2 rounded-2xl bg-[rgba(26,15,40,0.05)] border-2 border-[color:var(--ww-stroke-soft)] relative overflow-hidden flex items-center justify-center min-h-[300px]">
+                        <div className="scale-100">
+                            <WarriorPreview
+                                skinColor={state.appearance.skinColor}
+                                hairColor={state.appearance.hairColor}
+                                armorId={state.equipped.armor || 'default'}
+                                weaponId={state.equipped.weapon || 'default'}
+                                modelColor={(state.appearance as any).modelColor}
+                            />
+                        </div>
 
-                    <ColorPicker
-                        label="Hair Color"
-                        options={COLORS.hair}
-                        current={state.appearance.hairColor}
-                        onChange={(c: string) => updateAppearance({ hairColor: c })}
-                    />
+                        <div className="absolute bottom-4 left-0 right-0 text-center">
+                            <span className="ww-pill ww-pill--accent text-[10px] font-black px-3 py-1 uppercase tracking-widest">
+                                实时预览
+                            </span>
+                        </div>
+                    </div>
 
-                    <ColorPicker
-                        label="Eye Color"
-                        options={COLORS.eyes}
-                        current={state.appearance.eyeColor}
-                        onChange={(c: string) => updateAppearance({ eyeColor: c })}
-                    />
+                    {/* Controls */}
+                    <div className="w-full md:w-1/2 flex flex-col gap-6 overflow-hidden">
+                        <div className="space-y-4 flex flex-col h-full overflow-hidden">
+                            <h3 className="text-sm font-black ww-ink uppercase tracking-wider flex items-center gap-2 shrink-0">
+                                <span className="w-1 h-4 bg-[color:var(--ww-brand)] rounded-full"></span>
+                                选择配色主题
+                            </h3>
 
-                    <div className="space-y-3">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hair Style</span>
-                        <div className="grid grid-cols-2 gap-2">
-                            {HAIR_STYLES.map(style => (
-                                <button
-                                    key={style}
-                                    onClick={() => updateAppearance({ hairStyle: style as any })}
-                                    className={`py-2 rounded-lg text-xs font-bold uppercase transition-colors ${state.appearance.hairStyle === style
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
-                                        }`}
-                                >
-                                    {style}
-                                </button>
-                            ))}
+                            <div className="grid grid-cols-1 gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                {MODEL_COLORS.map(opt => {
+                                    const isUnlocked = state.unlockedColors.includes(opt.id);
+                                    const isSelected = (state.appearance as any).modelColor === opt.id || (!(state.appearance as any).modelColor && opt.id === 'blue');
+
+                                    return (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => handleColorSelect(opt.id)}
+                                            className={`
+                                                relative p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between group shrink-0
+                                                ${isSelected
+                                                    ? 'bg-[rgba(252,203,89,0.15)] border-[color:var(--ww-brand)] shadow-sm'
+                                                    : 'bg-white/5 border-[color:var(--ww-stroke-soft)] hover:border-[color:var(--ww-stroke)] hover:bg-white/10'}
+                                            `}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div
+                                                    className={`w-8 h-8 rounded-full border-2 shadow-sm flex items-center justify-center transition-transform group-hover:scale-110
+                                                        ${isSelected ? 'border-[color:var(--ww-brand)]' : 'border-transparent'}
+                                                    `}
+                                                    style={{ backgroundColor: opt.color }}
+                                                >
+                                                    {isSelected && <Check size={14} className="text-white drop-shadow-md" strokeWidth={4} />}
+                                                    {!isUnlocked && !isSelected && <Lock size={12} className="text-white/80" />}
+                                                </div>
+                                                <div>
+                                                    <span className={`text-sm font-black uppercase tracking-wide block ${isSelected ? 'ww-ink' : 'text-[color:var(--ww-muted)]'}`}>
+                                                        {opt.label}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {isSelected && (
+                                                <div className="w-2 h-2 rounded-full bg-[color:var(--ww-brand)]"></div>
+                                            )}
+
+                                            {!isUnlocked && (
+                                                <div className="flex items-center gap-1 px-2 py-1 rounded bg-black/5 border border-black/10">
+                                                    <Coins size={12} className="text-amber-600" />
+                                                    <span className="text-xs font-bold text-amber-700">100</span>
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="mt-auto p-4 rounded-xl bg-[rgba(26,15,40,0.03)] border border-[color:var(--ww-stroke-soft)]">
+                            <p className="text-[11px] ww-muted font-bold leading-relaxed">
+                                注意：选定的配色主题将应用于您的角色外观，并在对战中对所有玩家可见。
+                            </p>
                         </div>
                     </div>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };

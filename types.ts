@@ -129,7 +129,8 @@ export interface WarriorAppearance {
   skinColor: string; // hex
   hairColor: string; // hex
   hairStyle: 'default' | 'messy' | 'topknot' | 'bald';
-  eyeColor: string;
+  eyeColor: string; // Not used in sprites but kept for compat
+  modelColor?: string; // e.g. 'blue', 'red', 'yellow', 'purple', 'black'
 }
 
 export type ItemType = 'armor' | 'weapon';
@@ -152,6 +153,7 @@ export interface WarriorState {
     weapon: string | null;
   };
   appearance: WarriorAppearance;
+  unlockedColors: string[]; // ['blue', 'red', etc.]
 }
 
 export interface WritingMaterial {

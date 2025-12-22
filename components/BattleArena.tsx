@@ -948,7 +948,8 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
             skinColor: warriorState.appearance.skinColor,
             hairColor: warriorState.appearance.hairColor,
             armorId: warriorState.equipped.armor || 'default',
-            weaponId: warriorState.equipped.weapon || 'default'
+            weaponId: warriorState.equipped.weapon || 'default',
+            modelColor: warriorState.appearance.modelColor
           }}
           enemyIds={enemyAppearance}
           combatEvent={combatEvent}

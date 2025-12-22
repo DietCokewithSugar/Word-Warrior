@@ -8,6 +8,7 @@ interface BattleSceneProps {
         hairColor: string;
         armorId: string;
         weaponId: string;
+        modelColor?: string;
     };
     enemyIds: {
         skinColor: string;
@@ -53,10 +54,38 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
 
         function preload(this: Phaser.Scene) {
             // Load as plain image first to inspect dimensions dynamically
-            this.load.image('warrior_idle_raw', '/assets/warrior/warrior_idle_v3.png');
-            this.load.image('warrior_hit_raw', '/assets/warrior/warrior_hit.png');
-            this.load.image('warrior_attack_1_raw', '/assets/warrior/warrior_attack_1.png');
-            this.load.image('warrior_attack_2_raw', '/assets/warrior/warrior_attack_2.png');
+            // Load all color variants
+            this.load.image('warrior_idle_blue', '/assets/warrior/warrior_idle_v3.png?v=6');
+            this.load.image('warrior_idle_red', '/assets/warrior/warrior_idle_red.png?v=6');
+            this.load.image('warrior_idle_yellow', '/assets/warrior/warrior_idle_yellow.png?v=6');
+            this.load.image('warrior_idle_purple', '/assets/warrior/warrior_idle_purple.png?v=6');
+            this.load.image('warrior_idle_black', '/assets/warrior/warrior_idle_black.png?v=6');
+
+            // Combat Animations - Load Blue (Default/Raw)
+            this.load.image('warrior_hit_blue', '/assets/warrior/warrior_hit.png');
+            this.load.image('warrior_attack_1_blue', '/assets/warrior/warrior_attack_1.png');
+            this.load.image('warrior_attack_2_blue', '/assets/warrior/warrior_attack_2.png');
+
+            // Combat Animations - Load Red
+            this.load.image('warrior_hit_red', '/assets/warrior/warrior_hit_red.png');
+            this.load.image('warrior_attack_1_red', '/assets/warrior/warrior_attack_1_red.png');
+            this.load.image('warrior_attack_2_red', '/assets/warrior/warrior_attack_2_red.png');
+
+            // Combat Animations - Load Yellow
+            this.load.image('warrior_hit_yellow', '/assets/warrior/warrior_hit_yellow.png');
+            this.load.image('warrior_attack_1_yellow', '/assets/warrior/warrior_attack_1_yellow.png');
+            this.load.image('warrior_attack_2_yellow', '/assets/warrior/warrior_attack_2_yellow.png');
+
+            // Combat Animations - Load Purple
+            this.load.image('warrior_hit_purple', '/assets/warrior/warrior_hit_purple.png');
+            this.load.image('warrior_attack_1_purple', '/assets/warrior/warrior_attack_1_purple.png');
+            this.load.image('warrior_attack_2_purple', '/assets/warrior/warrior_attack_2_purple.png');
+
+            // Combat Animations - Load Black (Newly added)
+            // Assuming fallback for others until provided
+            this.load.image('warrior_hit_black', '/assets/warrior/warrior_hit_black.png');
+            this.load.image('warrior_attack_1_black', '/assets/warrior/warrior_attack_1_black.png');
+            this.load.image('warrior_attack_2_black', '/assets/warrior/warrior_attack_2_black.png');
         }
 
         function create(this: Phaser.Scene) {
@@ -96,19 +125,42 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
             };
 
             // --- 2. CREATE SPECIFIC ANIMATIONS ---
-            const idleWidth = createAnimFromRaw('warrior_idle_raw', 'warrior_idle_final', 'warrior_idle_anim', 8, 10, -1);
-            const hitWidth = createAnimFromRaw('warrior_hit_raw', 'warrior_hit_final', 'warrior_hit_anim', 6, 10, 0); // Repeat 0 = play once
+            const colors = ['blue', 'red', 'yellow', 'purple', 'black'];
 
-            // Attack Anims (4 frames)
-            const atk1Width = createAnimFromRaw('warrior_attack_1_raw', 'warrior_attack_1_final', 'warrior_attack_1_anim', 4, 12, 0);
-            const atk2Width = createAnimFromRaw('warrior_attack_2_raw', 'warrior_attack_2_final', 'warrior_attack_2_anim', 4, 12, 0);
+            // Helper to get width of animation for scaling calculations
+            // We use Blue as the reference for scaling ratios
+            let referenceIdleWidth: number | undefined;
+            let referenceHitWidth: number | undefined;
+            let referenceAtkWidth: number | undefined;
 
-            if (idleWidth && hitWidth) {
-                hitScaleRatioRef.current = idleWidth / hitWidth;
+            colors.forEach(color => {
+                // Idle (8 frames)
+                const wIdle = createAnimFromRaw(`warrior_idle_${color}`, `warrior_sheet_${color}`, `warrior_anim_${color}`, 8, 10, -1);
+                if (color === 'blue') referenceIdleWidth = wIdle;
+
+                // Hit (6 frames) - check if specific color asset exists, if not use blue
+                let hitKey = `warrior_hit_${color}`;
+                if (!this.textures.exists(hitKey)) hitKey = 'warrior_hit_blue';
+                const wHit = createAnimFromRaw(hitKey, `warrior_hit_sheet_${color}`, `warrior_hit_anim_${color}`, 6, 10, 0);
+                if (color === 'blue') referenceHitWidth = wHit;
+
+                // Attack 1 (4 frames)
+                let atk1Key = `warrior_attack_1_${color}`;
+                if (!this.textures.exists(atk1Key)) atk1Key = 'warrior_attack_1_blue';
+                createAnimFromRaw(atk1Key, `warrior_attack_1_sheet_${color}`, `warrior_attack_1_anim_${color}`, 4, 12, 0);
+
+                // Attack 2 (4 frames)
+                let atk2Key = `warrior_attack_2_${color}`;
+                if (!this.textures.exists(atk2Key)) atk2Key = 'warrior_attack_2_blue';
+                const wAtk = createAnimFromRaw(atk2Key, `warrior_attack_2_sheet_${color}`, `warrior_attack_2_anim_${color}`, 4, 12, 0);
+                if (color === 'blue') referenceAtkWidth = wAtk;
+            });
+
+            if (referenceIdleWidth && referenceHitWidth) {
+                hitScaleRatioRef.current = referenceIdleWidth / referenceHitWidth;
             }
-            if (idleWidth && atk1Width) {
-                // Assuming both attacks have same dimensions since they are from same set
-                attackScaleRatioRef.current = idleWidth / atk1Width;
+            if (referenceIdleWidth && referenceAtkWidth) {
+                attackScaleRatioRef.current = referenceIdleWidth / referenceAtkWidth;
             }
 
             // --- 3. CREATE CHARACTERS ---
@@ -160,6 +212,10 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
 
         if (!attacker || !victim) return;
 
+        // Determine colors
+        const victimColor = (combatEvent.target === 'player' ? (playerIds as any).modelColor : 'blue') || 'blue';
+        const attackerColor = (attackerName === 'player' ? (playerIds as any).modelColor : 'blue') || 'blue';
+
         // 1. Play Hit Animation on Victim
         const victimSprite = victim.getByName('sprite') as Phaser.GameObjects.Sprite;
         if (victimSprite) {
@@ -168,12 +224,12 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
             const baseScale = 2.5;
             victimSprite.setScale(baseScale * hitScaleRatioRef.current);
 
-            victimSprite.play('warrior_hit_anim', true);
+            victimSprite.play(`warrior_hit_anim_${victimColor}`, true);
 
             // Return to idle after. 'animationcomplete' fires when non-looping anim finishes
             victimSprite.once('animationcomplete', () => {
                 victimSprite.setScale(baseScale); // Reset scale
-                victimSprite.play('warrior_idle_anim', true);
+                victimSprite.play(`warrior_anim_${victimColor}`, true);
             });
         }
 
@@ -182,7 +238,7 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
             const attackerSprite = attacker.getByName('sprite') as Phaser.GameObjects.Sprite;
             if (attackerSprite) {
                 const isAtk1 = Math.random() > 0.5;
-                const animKey = isAtk1 ? 'warrior_attack_1_anim' : 'warrior_attack_2_anim';
+                const animKey = isAtk1 ? `warrior_attack_1_anim_${attackerColor}` : `warrior_attack_2_anim_${attackerColor}`;
                 const baseScale = 2.5;
 
                 attackerSprite.setScale(baseScale * attackScaleRatioRef.current);
@@ -190,7 +246,8 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
 
                 attackerSprite.once('animationcomplete', () => {
                     attackerSprite.setScale(baseScale);
-                    attackerSprite.play('warrior_idle_anim', true);
+                    const color = (attackerName === 'player' ? (playerIds as any).modelColor : 'blue') || 'blue';
+                    attackerSprite.play(`warrior_anim_${color}`, true);
                 });
             }
 
@@ -231,12 +288,15 @@ const BattleScene: React.FC<BattleSceneProps> = ({ playerIds, enemyIds, combatEv
         container.setName(name);
 
         // Add Sprite
-        // We assume 'warrior_idle' is available. If not loaded yet (race condition), might need check.
-        // But in 'create', it should be ready if loaded in preload.
-        if (scene.textures.exists('warrior_idle_final')) {
-            const sprite = scene.add.sprite(0, -32, 'warrior_idle_final');
+        const color = (data as any).modelColor || 'blue';
+        const idleAnim = `warrior_anim_${color}`;
+        // Fallback to blue if specific anim doesn't exist (though we created all)
+        const finalAnim = scene.anims.exists(idleAnim) ? idleAnim : 'warrior_anim_blue';
+
+        if (scene.anims.exists(finalAnim)) {
+            const sprite = scene.add.sprite(0, -32, `warrior_sheet_${color}`); // Initial texture
             sprite.setName('sprite');
-            sprite.play('warrior_idle_anim');
+            sprite.play(finalAnim);
             sprite.setScale(2.5); // Pixel art scaling
             container.add(sprite);
         } else {

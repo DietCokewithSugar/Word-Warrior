@@ -41,6 +41,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
   // PvP Specific State
   const [pvpState, setPvpState] = useState<'idle' | 'searching' | 'matched' | 'playing' | 'end'>('idle');
   const [opponentName, setOpponentName] = useState('Opponent');
+  const [opponentId, setOpponentId] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentQIndex, setCurrentQIndex] = useState(0);
@@ -513,6 +514,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
       const { data } = await supabase.from(table).select('player1_id, player2_id').eq('id', roomId).single();
       if (data) {
         const oppId = myRole === 'player1' ? data.player2_id : data.player1_id;
+        setOpponentId(oppId);
         const profile = await getOpponentProfile(oppId);
         if (profile) setOpponentName(profile.username);
       }
@@ -834,43 +836,172 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
     <div className="h-full flex flex-col gap-3 md:gap-8 max-w-5xl mx-auto pt-2 md:pt-4 pb-2 px-0">
 
       {/* HP HEADER - Scaled for Mobile */}
-      <div className="flex justify-between items-center gap-4 md:gap-12 pt-2 md:pt-4 px-4 md:px-8">
-        <div className={`flex-1 transition-all ${isShaking === 'player' ? 'animate-shake' : ''}`}>
-          <div className="flex items-center gap-2 md:gap-4 mb-2 md:mb-3">
-            <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center shadow-lg shrink-0">
-              <User className="text-indigo-500" size={18} />
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">YOU</p>
-              <p className="rpg-font text-base md:text-2xl font-black leading-none">{playerHp} HP</p>
-            </div>
-          </div>
-          <div className="h-2 md:h-3 bg-slate-200 dark:bg-slate-900 rounded-full overflow-hidden border dark:border-slate-800 shadow-inner">
-            <motion.div animate={{ width: `${(playerHp / playerStats.maxHp) * 100}%` }} className="h-full bg-gradient-to-r from-blue-600 to-indigo-500" />
-          </div>
-        </div>
+      <div className="pt-1 md:pt-3 px-4 md:px-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Mobile-first: single-row, equal-height (me / timer / opponent). */}
+          <div className="md:hidden">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
+              {/* Me */}
+              <div className={`ww-surface ww-surface--soft rounded-[18px] p-2 h-[86px] ${isShaking === 'player' ? 'animate-shake' : ''}`}>
+                <div className="h-full flex flex-col justify-between">
+                  <div className="flex items-center justify-start">
+                    <span className="ww-pill ww-pill--accent px-2 py-0.5 text-[9px] font-black tracking-widest">我方</span>
+                  </div>
 
-        <div className="flex flex-col items-center opacity-80 shrink-0">
-          <div className={`text-2xl font-black rpg-font ${timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-slate-400'}`}>
-            {mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant' ? timeLeft : '∞'}
-          </div>
-          <span className="text-[10px] md:text-xs font-black rpg-font text-slate-500">VS</span>
-        </div>
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="text-[11px] font-bold ww-muted truncate min-w-0">
+                      {user?.user_metadata?.username || user?.email?.split('@')?.[0] || '你'}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="rpg-font text-[16px] font-black ww-ink tabular-nums leading-none">{playerHp}</div>
+                      <div className="text-[9px] font-black ww-muted tracking-widest">HP</div>
+                    </div>
+                  </div>
 
-        <div className={`flex-1 text-right transition-all ${isShaking === 'enemy' ? 'animate-shake' : ''}`}>
-          <div className="flex items-center gap-2 md:gap-4 mb-2 md:mb-3 justify-end">
-            <div className="overflow-hidden text-right">
-              <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">
-                {mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant' ? opponentName : 'WRAITH'}
-              </p>
-              <p className="rpg-font text-base md:text-2xl font-black leading-none">{enemyHp} HP</p>
-            </div>
-            <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center shadow-lg shrink-0">
-              <User className="text-red-500" size={18} />
+                  <div
+                    className="h-3 rounded-full overflow-hidden"
+                    style={{ border: '2px solid var(--ww-stroke)', background: 'rgba(26,15,40,0.08)' }}
+                  >
+                    <motion.div
+                      animate={{ width: `${Math.max(0, Math.min(100, (playerHp / (playerStats?.maxHp || 1)) * 100))}%` }}
+                      className="h-full"
+                      style={{ background: 'linear-gradient(90deg, #2563eb, #6366f1)' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Timer */}
+              <div className="ww-surface ww-surface--soft rounded-[18px] px-3 h-[86px] flex flex-col items-center justify-center gap-1">
+                <div className={`rpg-font text-[20px] font-black ww-ink tabular-nums ${timeLeft <= 3 ? 'animate-pulse' : ''}`}>
+                  {mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant' ? timeLeft : '∞'}
+                </div>
+                <div className="text-[10px] font-black ww-muted tracking-[0.35em]">VS</div>
+              </div>
+
+              {/* Opponent */}
+              <div className={`ww-surface ww-surface--soft rounded-[18px] p-2 h-[86px] ${isShaking === 'enemy' ? 'animate-shake' : ''}`}>
+                <div className="h-full flex flex-col justify-between">
+                  <div className="flex items-center justify-start">
+                    <span className="ww-pill px-2 py-0.5 text-[9px] font-black tracking-widest">对手</span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="text-[11px] font-bold ww-muted truncate min-w-0">
+                      {mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant' ? opponentName : '幽影'}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="rpg-font text-[16px] font-black ww-ink tabular-nums leading-none">{enemyHp}</div>
+                      <div className="text-[9px] font-black ww-muted tracking-widest">HP</div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="h-3 rounded-full overflow-hidden"
+                    style={{ border: '2px solid var(--ww-stroke)', background: 'rgba(26,15,40,0.08)' }}
+                  >
+                    <motion.div
+                      animate={{ width: `${Math.max(0, Math.min(100, enemyHp))}%` }}
+                      className="h-full"
+                      style={{ background: 'linear-gradient(90deg, #f97316, #ef4444)' }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="h-2 md:h-3 bg-slate-200 dark:bg-slate-900 rounded-full overflow-hidden border dark:border-slate-800 shadow-inner">
-            <motion.div animate={{ width: `${enemyHp}%` }} className="h-full bg-gradient-to-l from-red-600 to-orange-500" />
+
+          {/* Desktop: richer 3-column layout */}
+          <div className="hidden md:grid grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
+            {/* Me */}
+            <div className={`ww-surface ww-surface--soft rounded-[22px] p-4 ${isShaking === 'player' ? 'animate-shake' : ''}`}>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: 'rgba(99,102,241,0.10)',
+                    border: '2px solid rgba(99,102,241,0.35)',
+                    boxShadow: '0 5px 0 rgba(0,0,0,0.16)',
+                  }}
+                >
+                  <User className="text-indigo-600" size={18} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="ww-pill ww-pill--accent px-2 py-0.5 text-[9px] font-black tracking-widest">我方</span>
+                    <div className="text-[13px] font-black ww-ink truncate">
+                      {user?.user_metadata?.username || user?.email?.split('@')?.[0] || '你'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <div className="rpg-font text-[18px] font-black ww-ink tabular-nums leading-none">{playerHp}</div>
+                  <div className="text-[10px] font-black ww-muted tracking-widest">HP</div>
+                </div>
+              </div>
+
+              <div
+                className="mt-2 h-3 rounded-full overflow-hidden"
+                style={{ border: '2px solid var(--ww-stroke)', background: 'rgba(26,15,40,0.08)' }}
+              >
+                <motion.div
+                  animate={{ width: `${Math.max(0, Math.min(100, (playerHp / (playerStats?.maxHp || 1)) * 100))}%` }}
+                  className="h-full"
+                  style={{ background: 'linear-gradient(90deg, #2563eb, #6366f1)' }}
+                />
+              </div>
+            </div>
+
+            {/* VS / Timer */}
+            <div className="flex flex-col items-center justify-center gap-1 px-2">
+              <div className={`ww-pill ww-pill--accent px-3 py-1 font-black rpg-font tabular-nums ${timeLeft <= 3 ? 'animate-pulse' : ''}`}>
+                {mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant' ? timeLeft : '∞'}
+              </div>
+              <div className="text-[10px] font-black ww-muted tracking-[0.35em]">VS</div>
+            </div>
+
+            {/* Opponent */}
+            <div className={`ww-surface ww-surface--soft rounded-[22px] p-4 ${isShaking === 'enemy' ? 'animate-shake' : ''}`}>
+              <div className="flex items-center gap-3">
+                <div className="text-left shrink-0">
+                  <div className="rpg-font text-[18px] font-black ww-ink tabular-nums leading-none">{enemyHp}</div>
+                  <div className="text-[10px] font-black ww-muted tracking-widest">HP</div>
+                </div>
+
+                <div className="min-w-0 flex-1 text-right">
+                  <div className="flex items-center justify-end gap-2 min-w-0">
+                    <div className="text-[13px] font-black ww-ink truncate">
+                      {mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant' ? opponentName : '幽影'}
+                    </div>
+                    <span className="ww-pill px-2 py-0.5 text-[9px] font-black tracking-widest">对手</span>
+                  </div>
+                </div>
+
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: 'rgba(239,68,68,0.10)',
+                    border: '2px solid rgba(239,68,68,0.35)',
+                    boxShadow: '0 5px 0 rgba(0,0,0,0.16)',
+                  }}
+                >
+                  <User className="text-red-600" size={18} />
+                </div>
+              </div>
+
+              <div
+                className="mt-2 h-3 rounded-full overflow-hidden"
+                style={{ border: '2px solid var(--ww-stroke)', background: 'rgba(26,15,40,0.08)' }}
+              >
+                <motion.div
+                  animate={{ width: `${Math.max(0, Math.min(100, enemyHp))}%` }}
+                  className="h-full"
+                  style={{ background: 'linear-gradient(90deg, #f97316, #ef4444)' }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1027,10 +1158,16 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
 
       </div>
 
-      <div className="flex justify-center gap-6 md:gap-16 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 pb-24 md:pb-8">
-        <div className="flex items-center gap-1.5"><Sword size={10} /> ATK: {playerStats.atk}</div>
-        <div className="flex items-center gap-1.5"><Shield size={10} /> DEF: {playerStats.def}</div>
-        <div className="flex items-center gap-1.5"><Zap size={10} /> CRIT: {Math.round(playerStats.crit * 100)}%</div>
+      <div className="flex justify-center gap-2 md:gap-3 pb-24 md:pb-8 px-3">
+        <div className="ww-pill px-3 py-1 text-[10px] font-black tracking-widest ww-ink inline-flex items-center gap-2">
+          <Sword size={12} /> ATK {playerStats.atk}
+        </div>
+        <div className="ww-pill px-3 py-1 text-[10px] font-black tracking-widest ww-ink inline-flex items-center gap-2">
+          <Shield size={12} /> DEF {playerStats.def}
+        </div>
+        <div className="ww-pill px-3 py-1 text-[10px] font-black tracking-widest ww-ink inline-flex items-center gap-2">
+          <Zap size={12} /> 暴击 {Math.round(playerStats.crit * 100)}%
+        </div>
       </div>
 
 
@@ -1107,3 +1244,4 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
 };
 
 export default BattleArena;
+

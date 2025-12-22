@@ -328,33 +328,84 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsArenaMenuOpen(false)}
-              className="fixed inset-0 z-[150]"
+              className="fixed inset-0 z-[150] bg-black/35 backdrop-blur-[2px]"
             />
-            <div className="fixed bottom-[112px] left-0 right-0 z-[180] flex gap-4 md:gap-8 items-end justify-center w-full px-4">
-              {PVP_MODES.map((mode, idx) => (
-                <motion.div
-                  key={mode.id}
-                  initial={{ opacity: 0, y: 50, scale: 0.5 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 50, scale: 0.5 }}
-                  transition={{ delay: idx * 0.05, type: 'spring', damping: 15 }}
-                  className="flex flex-col items-center gap-3 flex-1 min-w-[80px] max-w-[120px]"
-                >
+
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', damping: 18 }}
+              className="fixed bottom-[92px] left-0 right-0 z-[180] px-4 pb-3"
+            >
+              <div
+                className="max-w-4xl mx-auto ww-surface ww-surface--soft rounded-[2rem] p-3 md:p-4 overflow-hidden"
+                style={{ maxHeight: '70vh' }}
+              >
+                <div className="flex items-center justify-between gap-3 px-1 md:px-2">
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.32em] ww-muted">Arena</div>
+                    <div className="text-[13px] md:text-sm font-black ww-ink">对战模式</div>
+                  </div>
                   <button
-                    onClick={() => {
-                      setActiveTab(mode.id);
-                      setIsArenaMenuOpen(false);
-                    }}
-                    className={`w-16 h-16 md:w-20 md:h-20 p-4 md:p-6 rounded-3xl flex items-center justify-center bg-gradient-to-br ${mode.color} border-2 border-white/30 shadow-2xl transition-all active:scale-90 hover:scale-105`}
+                    onClick={() => setIsArenaMenuOpen(false)}
+                    className="ww-btn ww-btn--ink rounded-2xl px-3 py-2 text-[10px]"
                   >
-                    {mode.icon}
+                    <span className="inline-flex items-center gap-2">
+                      <X size={14} /> 关闭
+                    </span>
                   </button>
-                  <span className="bg-slate-900/95 dark:bg-white dark:text-black text-white text-[9px] md:text-[11px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-xl text-center">
-                    {mode.name}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
+                </div>
+
+                {/* Mobile: stacked compact cards. Desktop: 3-column grid. */}
+                <div className="mt-2 grid grid-cols-1 gap-2 md:mt-3 md:grid-cols-3 md:gap-3 overflow-y-auto pr-1" style={{ maxHeight: 'calc(70vh - 56px)' }}>
+                  {PVP_MODES.map((mode, idx) => (
+                    <motion.button
+                      key={mode.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 12 }}
+                      transition={{ delay: idx * 0.04 }}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.99 }}
+                      onClick={() => {
+                        setActiveTab(mode.id);
+                        setIsArenaMenuOpen(false);
+                      }}
+                      className="text-left ww-surface ww-surface--soft rounded-[16px] p-2.5 md:p-4"
+                      style={{ boxShadow: '0 10px 20px rgba(0,0,0,0.14), 0 0 0 4px rgba(255,255,255,0.10)' }}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-br ${mode.color} shrink-0`}
+                            style={{
+                              border: '2px solid rgba(43,23,63,0.22)',
+                              boxShadow: '0 5px 0 rgba(0,0,0,0.18)',
+                            }}
+                          >
+                            {React.cloneElement(mode.icon as any, { size: 18 })}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[13px] md:text-sm font-black ww-ink truncate">{mode.name}</div>
+                            <div className="mt-0.5 text-[10px] font-bold ww-muted truncate">
+                              {mode.description}
+                            </div>
+                            <div className="mt-1 hidden md:inline-flex ww-pill px-2 py-0.5 text-[9px] font-black tracking-widest whitespace-nowrap">
+                              {mode.mechanic}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="ww-btn ww-btn--accent inline-flex items-center justify-center rounded-xl px-3 py-2 text-[10px] shrink-0">
+                          匹配
+                        </div>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>

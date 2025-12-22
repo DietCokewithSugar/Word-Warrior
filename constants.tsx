@@ -35,8 +35,8 @@ export const TRAINING_MODES = [
 export const PVP_MODES = [
   {
     id: 'pvp_blitz',
-    name: '词汇闪击战',
-    description: '拼手速！英选汉，结算伤害 ATK * 1.5。',
+    name: '单词闪击战',
+    description: '拼手速！英选汉，伤害结算：ATK × 1.5。',
     icon: <Zap size={24} className="text-white" />,
     color: 'from-yellow-500/80 to-orange-500/80 border-yellow-500/50',
     mechanic: 'Speed-based Burst'

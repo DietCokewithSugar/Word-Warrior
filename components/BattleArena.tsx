@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Shield, User, Zap, Flame, Sword, Target, ShieldCheck, Loader2, XCircle } from 'lucide-react';
 import { startLiveSession, encodeAudio, resampleAudio } from '../services/liveService';
-import { MOCK_GRAMMAR_QUESTIONS, MOCK_VOCAB_CARDS, MOCK_CHANT_QUESTIONS } from '../constants.tsx';
+import { MOCK_GRAMMAR_QUESTIONS, MOCK_VOCAB_CARDS, MOCK_CHANT_QUESTIONS, PVP_MODES } from '../constants.tsx';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWarrior } from '../contexts/WarriorContext';
@@ -26,6 +26,9 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
   const { getColorClass, primaryColor } = useTheme();
   const { state: warriorState } = useWarrior();
   const userId = user?.id;
+  const modeMeta = PVP_MODES.find(m => m.id === mode);
+  const modeTitle = modeMeta?.name ?? '对战';
+  const modeDesc = modeMeta?.description ?? '匹配对手，开始战斗。';
 
   // Generic State
   const [playerHp, setPlayerHp] = useState(playerStats.hp);
@@ -785,47 +788,41 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
   // ============================================
   // RENDER - MATCHMAKING SCREEN
   // ============================================
-  // ============================================
-  // RENDER - MATCHMAKING SCREEN
-  // ============================================
   if ((mode === 'pvp_blitz' || mode === 'pvp_tactics' || mode === 'pvp_chant') && (pvpState === 'idle' || pvpState === 'searching')) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl md:text-6xl font-black rpg-font italic tracking-tighter text-indigo-500">
-            {mode === 'pvp_tactics' ? 'GRAMMAR STRONGHOLD' : mode === 'pvp_chant' ? 'CHANT DUEL' : 'BATTLE ARENA'}
-          </h1>
-          <p className="text-xs font-black uppercase tracking-[0.5em] text-slate-400">
-            {mode === 'pvp_tactics' ? 'PvP Grammar Tactics' : mode === 'pvp_chant' ? 'PvP Translation Duel' : 'PvP Vocabulary Blitz'}
-          </p>
-        </div>
+      <div className="h-full flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-xl ww-surface ww-surface--soft rounded-[2.5rem] p-6 md:p-8">
+          <div className="text-center space-y-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.35em] ww-muted">Arena</div>
+            <h1 className="text-2xl md:text-4xl font-black ww-ink">{modeTitle}</h1>
+            <p className="text-[11px] font-bold ww-muted leading-relaxed">{modeDesc}</p>
+          </div>
 
-        <div className="relative group">
-          <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full" />
-          <button
-            onClick={pvpState === 'searching' ? handleCancelSearch : startMatchmaking}
-            className="relative w-48 h-48 rounded-full bg-slate-900 border-4 border-indigo-500/50 flex flex-col items-center justify-center shadow-2xl transition-all hover:scale-105 active:scale-95"
-          >
-            {pvpState === 'searching' ? (
-              <>
-                <Loader2 size={48} className="text-indigo-500 animate-spin mb-2" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Searching...</span>
-                <span className="text-xs font-bold text-slate-500 mt-1">{searchingTime}s</span>
-              </>
-            ) : (
-              <>
-                <Sword size={48} className="text-white mb-2" />
-                <span className="text-xl font-black italic text-white">FIGHT</span>
-              </>
+          <div className="mt-6 flex flex-col items-center gap-4">
+            <button
+              onClick={pvpState === 'searching' ? handleCancelSearch : startMatchmaking}
+              className={`ww-btn ${pvpState === 'searching' ? 'ww-btn--ink' : 'ww-btn--accent'} rounded-[999px] w-[220px] md:w-[260px] py-4 md:py-5 text-[12px]`}
+            >
+              <span className="inline-flex items-center gap-3 justify-center">
+                {pvpState === 'searching' ? <Loader2 size={18} className="animate-spin" /> : <Sword size={18} />}
+                {pvpState === 'searching' ? '匹配中…' : '开始匹配'}
+              </span>
+            </button>
+
+            <div className="text-[11px] font-bold ww-muted">
+              {pvpState === 'searching' ? `已等待 ${searchingTime}s（再次点击可取消）` : '匹配成功后将自动进入战斗。'}
+            </div>
+
+            {pvpState === 'searching' && (
+              <button
+                onClick={handleCancelSearch}
+                className="inline-flex items-center gap-2 text-[11px] font-black tracking-widest ww-muted hover:text-red-600 transition-colors"
+              >
+                <XCircle size={14} /> 取消匹配
+              </button>
             )}
-          </button>
+          </div>
         </div>
-
-        {pvpState === 'searching' && (
-          <button onClick={handleCancelSearch} className="flex items-center gap-2 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-widest transition-colors">
-            <XCircle size={14} /> Cancel
-          </button>
-        )}
       </div>
     );
   }
@@ -939,7 +936,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                       key={`${currentQIndex}-${idx}`}
                       onClick={() => handleChoice(opt)}
                       disabled={hasAnsweredCurrent || !isGameConnected}
-                      className="p-4 md:p-8 dark:bg-slate-950 bg-slate-50 border-2 dark:border-slate-800 border-slate-200 rounded-2xl md:rounded-3xl hover:border-indigo-500 font-bold text-xs md:text-base transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="ww-choice p-4 md:p-8 text-xs md:text-base active:scale-[0.99] disabled:cursor-not-allowed"
                     >
                       {opt}
                     </button>
@@ -947,11 +944,11 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                 </div>
               </>
             ) : (
-              <div className="text-slate-500 font-bold animate-pulse">Loading Question...</div>
+              <div className="text-slate-500 font-bold animate-pulse">正在加载题目…</div>
             )}
 
             {!isGameConnected && (
-              <div className="text-xs font-black uppercase tracking-widest text-indigo-500 animate-pulse">Connecting to Live Server...</div>
+              <div className="text-xs font-black tracking-widest text-indigo-500 animate-pulse">正在连接对战服务器…</div>
             )}
 
           </div>
@@ -960,14 +957,14 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
         {mode === 'pvp_tactics' && (
           <div className="space-y-6 md:space-y-12 w-full max-w-2xl text-center px-6 md:px-0">
             <div className="space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-500">Syntax Challenge</span>
+              <span className="text-[10px] font-black tracking-[0.4em] text-cyan-600">语法挑战</span>
               <motion.h2
                 key={questions[currentQIndex]?.prompt || 'loading'}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-lg md:text-3xl font-bold dark:text-white text-slate-900 px-4 leading-relaxed italic"
               >
-                {questions[currentQIndex]?.prompt || (status === 'READY' ? 'Ready...' : 'Loading Question...')}
+                {questions[currentQIndex]?.prompt || (status === 'READY' ? '准备中…' : '正在加载题目…')}
               </motion.h2>
             </div>
             <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -976,16 +973,16 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                   key={opt}
                   onClick={() => handleChoice(opt)}
                   disabled={hasAnsweredCurrent || !isGameConnected}
-                  className="p-4 md:p-6 dark:bg-slate-950 bg-slate-50 border-2 dark:border-slate-800 border-slate-200 rounded-2xl md:rounded-3xl hover:border-cyan-500 font-bold text-xs md:text-lg transition-all active:scale-95 disabled:opacity-50"
+                  className="ww-choice p-4 md:p-6 text-xs md:text-lg active:scale-[0.99] disabled:opacity-50"
                 >
                   {opt}
                 </button>
               )) || (
-                  <div className="col-span-2 text-slate-500 animate-pulse">Waiting for server...</div>
+                  <div className="col-span-2 text-slate-500 animate-pulse">等待服务器下发题目…</div>
                 )}
             </div>
             {!isGameConnected && (
-              <div className="text-xs font-black uppercase tracking-widest text-indigo-500 animate-pulse">Connecting to Live Server...</div>
+              <div className="text-xs font-black tracking-widest text-indigo-500 animate-pulse">正在连接对战服务器…</div>
             )}
           </div>
         )}
@@ -993,14 +990,14 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
         {mode === 'pvp_chant' && (
           <div className="space-y-6 md:space-y-12 w-full max-w-2xl text-center px-6 md:px-0">
             <div className="space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-500">Translation Challenge</span>
+              <span className="text-[10px] font-black tracking-[0.4em] text-cyan-600">咏唱挑战</span>
               <motion.h2
                 key={questions[currentQIndex]?.prompt || 'loading'}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-lg md:text-3xl font-bold dark:text-white text-slate-900 px-4 leading-relaxed italic"
               >
-                {questions[currentQIndex]?.prompt || (status === 'READY' ? 'Ready...' : 'Loading Question...')}
+                {questions[currentQIndex]?.prompt || (status === 'READY' ? '准备中…' : '正在加载题目…')}
               </motion.h2>
             </div>
             <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -1009,16 +1006,16 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                   key={opt}
                   onClick={() => handleChoice(opt)}
                   disabled={hasAnsweredCurrent || !isGameConnected}
-                  className="p-4 md:p-6 dark:bg-slate-950 bg-slate-50 border-2 dark:border-slate-800 border-slate-200 rounded-2xl md:rounded-3xl hover:border-cyan-500 font-bold text-xs md:text-lg transition-all active:scale-95 disabled:opacity-50"
+                  className="ww-choice p-4 md:p-6 text-xs md:text-lg active:scale-[0.99] disabled:opacity-50"
                 >
                   {opt}
                 </button>
               )) || (
-                  <div className="col-span-2 text-slate-500 animate-pulse">Waiting for server...</div>
+                  <div className="col-span-2 text-slate-500 animate-pulse">等待服务器下发题目…</div>
                 )}
             </div>
             {!isGameConnected && (
-              <div className="text-xs font-black uppercase tracking-widest text-indigo-500 animate-pulse">Connecting to Live Server...</div>
+              <div className="text-xs font-black tracking-widest text-indigo-500 animate-pulse">正在连接对战服务器…</div>
             )}
           </div>
         )}
@@ -1052,34 +1049,34 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
             >
               <div className="space-y-4">
                 <h2 className={`text-6xl md:text-8xl font-black italic tracking-tighter ${status === 'YOU WIN!' ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.5)]' : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'}`}>
-                  {status}
+                  {status === 'YOU WIN!' ? '胜利！' : '失败…'}
                 </h2>
-                <p className="text-slate-400 font-bold tracking-widest uppercase">
-                  {status === 'YOU WIN!' ? 'Victory Achieved' : 'Defeat accepted'}
+                <p className="text-slate-400 font-bold tracking-widest">
+                  {status === 'YOU WIN!' ? '奖励已结算' : '不要气馁，再来一局'}
                 </p>
               </div>
 
               {matchDetails && (
                 <div className="bg-slate-800/50 rounded-xl p-6 text-left space-y-2 min-w-[250px] border border-slate-700">
                   <div className="flex justify-between text-slate-400 font-bold">
-                    <span>Base Score:</span>
+                    <span>基础分：</span>
                     <span className={matchDetails.base >= 0 ? 'text-green-400' : 'text-red-400'}>{matchDetails.base > 0 ? '+' : ''}{matchDetails.base}</span>
                   </div>
                   {matchDetails.hp_bonus > 0 && (
                     <div className="flex justify-between text-slate-400 font-bold">
-                      <span>HP Bonus:</span>
+                      <span>生命加成：</span>
                       <span className="text-green-400">+{matchDetails.hp_bonus}</span>
                     </div>
                   )}
                   {matchDetails.streak_bonus > 0 && (
                     <div className="flex justify-between text-slate-400 font-bold">
-                      <span>Streak Bonus:</span>
+                      <span>连胜加成：</span>
                       <span className="text-green-400">+{matchDetails.streak_bonus}</span>
                     </div>
                   )}
                   <div className="h-px bg-slate-600 my-2" />
                   <div className="flex justify-between text-white font-black text-xl">
-                    <span>Total:</span>
+                    <span>总计：</span>
                     <span className={(matchDetails.base + matchDetails.hp_bonus + matchDetails.streak_bonus) >= 0 ? 'text-green-400' : 'text-red-400'}>
                       {(matchDetails.base + matchDetails.hp_bonus + matchDetails.streak_bonus) > 0 ? '+' : ''}
                       {matchDetails.base + matchDetails.hp_bonus + matchDetails.streak_bonus}
@@ -1093,7 +1090,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                   onClick={() => status === 'YOU WIN!' ? onVictory() : onDefeat()}
                   className={`px-12 py-4 rounded-2xl font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-xl ${status === 'YOU WIN!' ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-red-500 text-white hover:bg-red-400'}`}
                 >
-                  {status === 'YOU WIN!' ? 'CLAIM REWARD' : 'RETURN TO BASE'}
+                  {status === 'YOU WIN!' ? '领取奖励' : '返回'}
                 </button>
               </div>
             </motion.div>

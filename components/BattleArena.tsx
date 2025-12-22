@@ -12,7 +12,7 @@ import BattleScene from './Warrior/BattleScene';
 import ChantBattleScene from './Warrior/ChantBattleScene';
 import { supabase } from '../services/supabaseClient';
 import { findWordBlitzMatch, cancelWordBlitzMatchmaking, submitWordBlitzAnswer, getOpponentProfile, checkWordBlitzMatchStatus, abandonWordBlitzMatch, PvPRoom } from '../services/pvpService';
-import { findGrammarMatch, cancelGrammarMatchmaking, submitGrammarAnswer } from '../services/grammarPvpService';
+import { findGrammarMatch, cancelGrammarMatchmaking, submitGrammarAnswer, checkGrammarMatchStatus } from '../services/grammarPvpService';
 
 interface BattleArenaProps {
   mode: string;
@@ -96,17 +96,14 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
         matchmakingChannelRef.current = null;
       }
       if (roomId && userId) {
-        // Only cancel matchmaking if searching - if playing, consider abandoning? 
-        // Actually this cleanup runs on unmount.
-        // If we are 'playing', we might want to abandon OR just leave connection (reconnectable).
-        // For now, let's just ensure we clean up matchmaking request.
         if (pvpState === 'searching') {
           if (mode === 'pvp_blitz') cancelWordBlitzMatchmaking(userId);
           if (mode === 'pvp_tactics') cancelGrammarMatchmaking(userId);
+          // Clear polling interval if unmounting while searching
+          if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
         } else if (pvpState === 'playing' || pvpState === 'matched') {
           // If unmounting while playing, treat as abandon?
           // Optional: abandonWordBlitzMatch(roomId, userId);
-          // Decided NOT to auto-abandon on tab switch/unmount to allow refresh/resume.
         }
       }
     };
@@ -118,7 +115,9 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
 
   // 1. Matchmaking
   // 1. Matchmaking
+  // 1. Matchmaking
   const matchmakingChannelRef = useRef<any>(null); // Keep track of channel
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null); // Matchmaking fallback poll
 
   const startMatchmaking = async () => {
     if (!userId) return;
@@ -132,16 +131,50 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
     }
 
     // Timer for UI only - Modified to trigger AI
+    // Timer for UI only - Modified to trigger AI
     const timer = setInterval(() => {
       setSearchingTime(t => {
         if (t >= 10) {
           clearInterval(timer); // Stop counting
+          // Clear polling interval if exists
+          if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           startAiMatch(); // Switch to AI
           return t;
         }
         return t + 1;
       });
     }, 1000);
+
+    // Polling Fallback (Every 2s) - Fix for race condition/missed socket events
+    const pollingInterval = setInterval(async () => {
+      if (pvpState !== 'searching') {
+        clearInterval(pollingInterval);
+        return;
+      }
+
+      const checkFn = mode === 'pvp_tactics' ? checkGrammarMatchStatus : checkWordBlitzMatchStatus;
+      const match = await checkFn(userId);
+
+      if (match) {
+        console.log('🔄 Polling found match!', match);
+        clearInterval(timer);
+        clearInterval(pollingInterval);
+
+        if (matchmakingChannelRef.current) {
+          await supabase.removeChannel(matchmakingChannelRef.current);
+          matchmakingChannelRef.current = null;
+        }
+
+        setMyRole(match.role);
+        setRoomId(match.roomId);
+        setPvpState('matched');
+        setStatus('MATCH FOUND!');
+      }
+    }, 2000);
+
+    // Store polling interval to clear it on cancel/AI switch
+    // We need a ref for this content to be accessible in cancel
+    pollingIntervalRef.current = pollingInterval;
 
     // 1. Setup Realtime Subscription FIRST (to avoid race condition)
     const setupSubscription = new Promise<void>((resolve) => {
@@ -237,6 +270,11 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
     if (matchmakingChannelRef.current) {
       await supabase.removeChannel(matchmakingChannelRef.current);
       matchmakingChannelRef.current = null;
+    }
+
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
 
     // We don't await these if switching to AI to speed up UI transition

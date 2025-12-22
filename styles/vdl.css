@@ -90,6 +90,24 @@ body{
 .ww-btn:active{ transform: translateY(2px); box-shadow: 0 4px 0 rgba(0,0,0,0.35); }
 .ww-btn:disabled{ opacity: 0.55; cursor: not-allowed; }
 
+/* Choice buttons (battle options / answers) */
+.ww-choice{
+  border: 3px solid var(--ww-stroke);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.72);
+  color: var(--ww-ink);
+  font-weight: 900;
+  box-shadow: 0 6px 0 rgba(0,0,0,0.25);
+  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.ww-choice:hover{ filter: brightness(1.03) saturate(1.04); }
+.ww-choice:active{ transform: translateY(2px); box-shadow: 0 4px 0 rgba(0,0,0,0.25); }
+.ww-choice:disabled{ opacity: 0.55; cursor: not-allowed; }
+.ww-choice--ok{ border-color: rgba(16,185,129,0.9); }
+.ww-choice--bad{ border-color: rgba(239,68,68,0.9); }
+
 .ww-btn--accent{
   background: var(--ww-accent);
 }

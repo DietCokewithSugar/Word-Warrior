@@ -594,7 +594,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                   } else {
                     claimWordBlitzVictory(roomId, userId);
                   }
-                  setStatus('对手未能加入! 你赢了!');
+                  setStatus('YOU WIN!');
                   setPvpState('end');
                   isFinishedRef.current = true;
                 }
@@ -647,7 +647,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
             } else {
               claimWordBlitzVictory(roomId, userId);
             }
-            setStatus('对手离开了! 你赢了!');
+            setStatus('YOU WIN!');
             setPvpState('end');
             isFinishedRef.current = true; // Lock state instantly
           }
@@ -1226,11 +1226,10 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
               transition={{ duration: 0.16 }}
-              className={`absolute top-3 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-full text-[12px] font-black tracking-widest shadow-lg border ${
-                choiceFeedback.kind === 'bad'
+              className={`absolute top-3 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-full text-[12px] font-black tracking-widest shadow-lg border ${choiceFeedback.kind === 'bad'
                   ? 'bg-red-500 text-white border-red-200'
                   : 'bg-emerald-500 text-white border-emerald-200'
-              }`}
+                }`}
             >
               {choiceFeedback.text}
             </motion.div>

@@ -655,7 +655,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
     isFinishedRef.current = true;
     setPvpState('end');
     if (result === 'won') {
-      setStatus('YOU WIN!');
+      setStatus('VICTORY');
       // Set basic match details for AI match so summary UI works
       setMatchDetails({
         base: 10,
@@ -665,7 +665,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
         gold_gain: 5
       });
     } else {
-      setStatus('YOU LOSE!');
+      setStatus('DEFEAT');
       setMatchDetails({
         base: -5,
         hp_bonus: 0,
@@ -750,7 +750,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                   } else {
                     claimWordBlitzVictory(roomId, userId);
                   }
-                  setStatus('YOU WIN!');
+                  setStatus('OPPONENT_DESERTED');
                   setPvpState('end');
                   isFinishedRef.current = true;
                 }
@@ -787,6 +787,12 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
 
           // If the opponent left, we claim victory!
           if (key === currentOpponentId) {
+            // CRITICAL: Stop exit check if game is already over
+            if (isFinishedRef.current) {
+              console.log('🛡️ Ignoring opponent exit because game is already FINISHED.');
+              return;
+            }
+
             // We don't check pvpState strictly to 'playing' just in case it's 'matched' transitioning to 'playing'
             // But we should ensure we are not 'end' or 'idle'
             // Let's check if we have a room.
@@ -803,7 +809,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
             } else {
               claimWordBlitzVictory(roomId, userId);
             }
-            setStatus('YOU WIN!');
+            setStatus('OPPONENT_DESERTED');
             setPvpState('end');
             isFinishedRef.current = true; // Lock state instantly
           }
@@ -936,10 +942,10 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
       setPvpState('end');
       isFinishedRef.current = true; // Lock state
       if (room.winner_id === userId) {
-        setStatus('YOU WIN!');
+        setStatus('VICTORY');
         // onVictory(); // Waiting for manual exit
       } else {
-        setStatus('YOU LOSE!');
+        setStatus('DEFEAT');
         // onDefeat(); // Waiting for manual exit
       }
 
@@ -1595,7 +1601,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
 
       {/* GAME OVER OVERLAY */}
       <AnimatePresence>
-        {status === 'YOU WIN!' || status === 'YOU LOSE!' ? (
+        {status === 'VICTORY' || status === 'DEFEAT' || status === 'OPPONENT_DESERTED' ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1608,11 +1614,15 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
               className="text-center space-y-8"
             >
               <div className="space-y-4">
-                <h2 className={`text-6xl md:text-8xl font-black italic tracking-tighter ${status === 'YOU WIN!' ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.5)]' : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'}`}>
-                  {status === 'YOU WIN!' ? '胜利！' : '失败…'}
+                <h2 className={`text-6xl md:text-8xl font-black italic tracking-tighter ${
+                  status === 'VICTORY' || status === 'OPPONENT_DESERTED' 
+                    ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.5)]' 
+                    : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'
+                }`}>
+                  {status === 'VICTORY' ? '战斗胜利' : (status === 'OPPONENT_DESERTED' ? '对方已退出' : '战斗失败')}
                 </h2>
                 <p className="text-slate-400 font-bold tracking-widest">
-                  {status === 'YOU WIN!' ? '奖励已结算' : '不要气馁，再来一局'}
+                  {status === 'VICTORY' || status === 'OPPONENT_DESERTED' ? '奖励已结算' : '不要气馁，再来一局'}
                 </p>
               </div>
 
@@ -1638,7 +1648,7 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                   )}
                   {matchDetails.protection && matchDetails.protection > 0 && (
                     <div className="flex justify-between text-slate-400 font-bold">
-                      <span>{status === 'YOU WIN!' ? '段位保护：' : '败方保护：'}</span>
+                      <span>{(status === 'VICTORY' || status === 'OPPONENT_DESERTED') ? '段位保护：' : '败方保护：'}</span>
                       <span className="text-blue-400">+{matchDetails.protection}</span>
                     </div>
                   )}
@@ -1677,15 +1687,19 @@ const BattleArena: React.FC<BattleArenaProps> = ({ mode, playerStats, onVictory,
                 <button
                   onClick={() => {
                     console.log('🏁 Match result button clicked, status:', status);
-                    if (status === 'YOU WIN!') {
+                    if (status === 'VICTORY' || status === 'OPPONENT_DESERTED') {
                       onVictory();
                     } else {
                       onDefeat();
                     }
                   }}
-                  className={`px-12 py-4 rounded-2xl font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-xl ${status === 'YOU WIN!' ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-red-500 text-white hover:bg-red-400'}`}
+                  className={`px-12 py-4 rounded-2xl font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-xl ${
+                    status === 'VICTORY' || status === 'OPPONENT_DESERTED' 
+                      ? 'bg-yellow-400 text-black hover:bg-yellow-300' 
+                      : 'bg-red-500 text-white hover:bg-red-400'
+                  }`}
                 >
-                  {status === 'YOU WIN!' ? '领取奖励' : '返回'}
+                  {(status === 'VICTORY' || status === 'OPPONENT_DESERTED') ? '领取奖励' : '返回'}
                 </button>
               </div>
             </motion.div>

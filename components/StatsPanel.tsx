@@ -45,7 +45,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick, o
     def: stats.def,
     hp: stats.maxHp,
     level: stats.level
-  }, gear);
+  });
   const currentRank = getKPRank(kp);
 
   const StatRow = ({
@@ -65,7 +65,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick, o
     statType: string;
     gearContribution?: number;
   }) => (
-    <div 
+    <div
       className="relative flex items-center justify-between gap-3 py-3 px-4 rounded-2xl bg-[rgba(255,255,255,0.35)] border-2 border-[color:var(--ww-stroke-soft)] cursor-pointer group hover:border-[color:var(--ww-stroke)] transition-colors"
       onClick={() => setActiveTooltip(activeTooltip === statType ? null : statType)}
     >
@@ -100,7 +100,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick, o
           <div className={`absolute -top-2 -right-2 z-10 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter shadow-lg border-2 ${currentRank.bg} ${currentRank.color} ${currentRank.border} transform -rotate-12 group-hover:rotate-0 transition-transform`}>
             {currentRank.name}
           </div>
-          
+
           <div
             className={`w-40 h-40 md:w-44 md:h-44 rounded-[999px] bg-[rgba(252,203,89,0.95)] shadow-2xl relative overflow-hidden flex items-center justify-center border-4 ${currentRank.border}`}
           >
@@ -143,32 +143,47 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ stats, username, onShopClick, o
           }
           colorClassName={getColorClass('text', 500)}
         />
-        <StatRow 
-          icon={Heart} 
-          label="生命上限 (HP)" 
+        <StatRow
+          icon={Heart}
+          label="生命上限 (HP)"
           statType="HP"
-          contribution={stats.maxHp * 2}
+          contribution={(stats.maxHp - gear.hp) * 2}
           gearContribution={gear.hp * 2}
-          value={stats.maxHp + (gear.hp > 0 ? ` (+${gear.hp})` : '')} 
-          colorClassName="text-fuchsia-600" 
+          value={
+            <div className="flex items-center gap-1">
+              {stats.maxHp}
+              {gear.hp > 0 && <span className="text-[10px] text-fuchsia-500/80 font-bold">(+{gear.hp})</span>}
+            </div>
+          }
+          colorClassName="text-fuchsia-600"
         />
-        <StatRow 
-          icon={Swords} 
-          label="词汇攻击 (ATK)" 
+        <StatRow
+          icon={Swords}
+          label="词汇攻击 (ATK)"
           statType="ATK"
-          contribution={stats.atk * 10}
+          contribution={(stats.atk - gear.atk) * 10}
           gearContribution={gear.atk * 10}
-          value={stats.atk + (gear.atk > 0 ? ` (+${gear.atk})` : '')} 
-          colorClassName="text-blue-600" 
+          value={
+            <div className="flex items-center gap-1">
+              {stats.atk}
+              {gear.atk > 0 && <span className="text-[10px] text-blue-500/80 font-bold">(+{gear.atk})</span>}
+            </div>
+          }
+          colorClassName="text-blue-600"
         />
-        <StatRow 
-          icon={Shield} 
-          label="语法防御 (DEF)" 
+        <StatRow
+          icon={Shield}
+          label="语法防御 (DEF)"
           statType="DEF"
-          contribution={stats.def * 15}
+          contribution={(stats.def - gear.def) * 15}
           gearContribution={gear.def * 15}
-          value={stats.def + (gear.def > 0 ? ` (+${gear.def})` : '')} 
-          colorClassName="text-emerald-600" 
+          value={
+            <div className="flex items-center gap-1">
+              {stats.def}
+              {gear.def > 0 && <span className="text-[10px] text-emerald-500/80 font-bold">(+{gear.def})</span>}
+            </div>
+          }
+          colorClassName="text-emerald-600"
         />
       </div>
 

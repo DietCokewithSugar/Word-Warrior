@@ -1,6 +1,6 @@
 
 import { supabase, TEST_USER_ID } from './supabaseClient';
-import { UserStats, Rank, DatabaseUserStats, DatabaseUserProfile } from '../types';
+import { UserStats, Rank, DatabaseUserStats, DatabaseUserProfile, ShopItem } from '../types';
 
 /**
  * Database Service for Word Warrior
@@ -183,6 +183,118 @@ export const purchaseItem = async (userId: string, price: number): Promise<{ suc
     }
 
     return { success: true, newGold: data };
+};
+
+/**
+ * Get all shop items
+ */
+export const getShopItems = async (): Promise<ShopItem[]> => {
+    const { data, error } = await supabase
+        .from('shop_items')
+        .select('*')
+        .order('price', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching shop items:', error);
+        return [];
+    }
+
+    // Map database snake_case to camelCase if needed, but here we can just cast if names match or map manually
+    // ShopItem expects statBonus object, but DB has separate columns.
+    return data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        price: item.price,
+        description: `${item.name} - ${item.type}`,
+        assetKey: item.asset_key,
+        statBonus: {
+            atk: item.atk_bonus || undefined,
+            def: item.def_bonus || undefined,
+            hp: item.hp_bonus || undefined
+        }
+    }));
+};
+
+/**
+ * Get user equipment
+ */
+export const getUserEquipment = async (userId: string = TEST_USER_ID) => {
+    const { data, error } = await supabase
+        .from('user_equipment')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+    if (error) {
+        if (error.code !== 'PGRST116') { // Not found is okay
+            console.error('Error fetching user equipment:', error);
+        }
+        return null;
+    }
+
+    return {
+        weapon: data.weapon_id as string | null,
+        shield: data.shield_id as string | null,
+        armor: data.armor_id as string | null
+    };
+};
+
+/**
+ * Purchase equipment (new logic)
+ */
+/**
+ * Purchase equipment
+ * Now adds to inventory, does not necessarily equip immediately.
+ */
+export const purchaseEquipment = async (userId: string, itemId: string): Promise<{ success: boolean, newGold?: number, message?: string }> => {
+    const { data, error } = await supabase
+        .rpc('purchase_equipment', {
+            p_user_id: userId,
+            p_item_id: itemId
+        });
+
+    if (error) {
+        console.error('Error purchasing equipment:', error);
+        return { success: false, message: error.message };
+    }
+
+    return data; // Returns { success, new_gold, message }
+};
+
+/**
+ * Get user inventory (item IDs)
+ */
+export const getUserInventory = async (userId: string = TEST_USER_ID): Promise<string[]> => {
+    const { data, error } = await supabase
+        .from('user_inventory')
+        .select('item_id')
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('Error fetching inventory:', error);
+        return [];
+    }
+
+    return data.map((row: any) => row.item_id);
+};
+
+/**
+ * Equip an item
+ */
+export const equipItem = async (userId: string, itemId: string): Promise<{ success: boolean, message?: string }> => {
+    const { data, error } = await supabase
+        .rpc('equip_item', {
+            p_user_id: userId,
+            p_item_id: itemId
+        });
+
+    if (error) {
+        console.error('Error equipping item:', error);
+        return { success: false, message: error.message };
+    }
+
+    return data;
 };
 
 // ============================================

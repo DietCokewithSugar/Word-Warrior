@@ -56,136 +56,74 @@ interface AuthenticatedAppProps {
 const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
   const { user } = useAuth();
   const { themeMode, getColorClass, primaryColor, avatar } = useTheme(); // Use Theme Context
-  const { state: warriorState, addGold, getItemDetails } = useWarrior();
-
-  const getGearBonuses = () => {
-    const bonuses = { atk: 0, def: 0, hp: 0 };
-    if (warriorState.equipped.weapon) {
-      const item = getItemDetails(warriorState.equipped.weapon);
-      if (item?.statBonus) {
-        bonuses.atk += item.statBonus.atk || 0;
-        bonuses.def += item.statBonus.def || 0;
-        bonuses.hp += item.statBonus.hp || 0;
-      }
-    }
-    if (warriorState.equipped.armor) {
-      const item = getItemDetails(warriorState.equipped.armor);
-      if (item?.statBonus) {
-        bonuses.atk += item.statBonus.atk || 0;
-        bonuses.def += item.statBonus.def || 0;
-        bonuses.hp += item.statBonus.hp || 0;
-      }
-    }
-    return bonuses;
-  };
-
-  const [stats, setStats] = useState<UserStats>(() => {
-    const saved = localStorage.getItem(`ww_stats_${userId}`);
-    return saved ? { ...INITIAL_STATS, ...JSON.parse(saved) } : INITIAL_STATS;
-  });
+  const { state: warriorState, addGold, getItemDetails, updateStats } = useWarrior();
 
   const [kpNotification, setKpNotification] = useState<{ gain: number; promotion?: { from: string; to: string } } | null>(null);
 
   const [activeTab, setActiveTab] = useState('vocab');
   const [isArenaMenuOpen, setIsArenaMenuOpen] = useState(false);
-  const [dbLoaded, setDbLoaded] = useState(false);
-
-  // Sync stats from database on load
-  useEffect(() => {
-    if (!userId) return;
-
-    const loadStats = async () => {
-      console.log('Fetching user stats from database...');
-      const dbStats = await getUserStats(userId);
-      if (dbStats) {
-        console.log('Stats loaded:', dbStats);
-        setStats(prev => ({ ...prev, ...dbStats }));
-      }
-      setDbLoaded(true);
-    };
-
-    loadStats();
-  }, [userId]);
-
-  // Sync stats to database on change (debounced)
-  useEffect(() => {
-    if (!dbLoaded || !userId) return;
-
-    const timer = setTimeout(() => {
-      console.log('Syncing stats to database:', stats);
-      // Exclude gold from sync here as it's managed via WarriorContext + RPC
-      const { gold, ...statsToSync } = stats;
-      updateUserStats(userId, statsToSync);
-      // Also update local storage as backup
-      localStorage.setItem(`ww_stats_${userId}`, JSON.stringify(stats));
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [stats, userId, dbLoaded]);
-
-  // Handlers ... (unchanged)
 
   // Watch for equipment changes to trigger KP notification
   const prevKPRef = React.useRef<number | null>(null);
+
+  // Use stats from context
+  const stats = warriorState.stats;
+
   useEffect(() => {
-    if (!dbLoaded) return;
-    
-    const gear = getGearBonuses();
-    const currentKP = calculateKP({ 
-      atk: stats.atk, 
-      def: stats.def, 
-      hp: stats.maxHp, 
-      level: stats.level 
-    }, gear);
-    
+    // stats already includes gear bonuses from DB
+    const currentKP = calculateKP({
+      atk: stats.atk,
+      def: stats.def,
+      hp: stats.maxHp,
+      level: stats.level
+    });
+
     if (prevKPRef.current !== null && currentKP > prevKPRef.current) {
       const oldRank = getKPRank(prevKPRef.current);
       const newRank = getKPRank(currentKP);
       const gain = currentKP - prevKPRef.current;
-      
+
       setKpNotification({
         gain: gain,
         promotion: newRank.name !== oldRank.name ? { from: oldRank.name, to: newRank.name } : undefined
       });
     }
     prevKPRef.current = currentKP;
-  }, [warriorState.equipped, stats.level, stats.atk, stats.def, stats.maxHp, dbLoaded]);
+  }, [warriorState.equipped, stats.level, stats.atk, stats.def, stats.maxHp]);
 
   const handleGainExp = (exp: number, statType?: 'atk' | 'def' | 'crit' | 'hp', word?: string) => {
-    setStats(prev => {
-      let newStats = { ...prev, exp: prev.exp + exp };
+    let newStats = { ...stats, exp: stats.exp + exp };
 
-      // Level Up Logic
-      const expNeeded = newStats.level * 100;
-      if (newStats.exp >= expNeeded) {
-        newStats.exp -= expNeeded;
-        newStats.level += 1;
+    // Level Up Logic
+    const expNeeded = newStats.level * 100;
+    if (newStats.exp >= expNeeded) {
+      newStats.exp -= expNeeded;
+      newStats.level += 1;
 
-        // Proportional Stat Increase based on New Level
-        const levelScaler = newStats.level;
-        newStats.maxHp += 10 * levelScaler;
-        newStats.hp = newStats.maxHp;     // Full heal on level up
-        newStats.atk += 1 * levelScaler;
-        newStats.def += 1 * levelScaler;
-        newStats.crit = parseFloat((newStats.crit + (0.001 * levelScaler)).toFixed(3));
-      }
+      // Proportional Stat Increase based on New Level
+      const levelScaler = newStats.level;
+      newStats.maxHp += 10 * levelScaler;
+      newStats.hp = newStats.maxHp;     // Full heal on level up
+      newStats.atk += 1 * levelScaler;
+      newStats.def += 1 * levelScaler;
+      newStats.crit = parseFloat((newStats.crit + (0.001 * levelScaler)).toFixed(3));
+    }
 
-      // Stat Increase from Training
-      if (statType) {
-        if (statType === 'crit') newStats.crit = parseFloat((newStats.crit + 0.001).toFixed(3));
-        else (newStats as any)[statType] += 1;
-      }
+    // Stat Increase from Training
+    if (statType) {
+      if (statType === 'crit') newStats.crit = parseFloat((newStats.crit + 0.001).toFixed(3));
+      else (newStats as any)[statType] += 1;
+    }
 
-      // Track Word Mastery
-      if (statType === 'atk' && word) {
-        newStats.masteredWordsCount = (newStats.masteredWordsCount || 0) + 1;
-        addMasteredWord(userId, word).catch(err =>
-          console.error('Error adding mastered word to DB:', err)
-        );
-      }
+    // Track Word Mastery
+    if (statType === 'atk' && word) {
+      newStats.masteredWordsCount = (newStats.masteredWordsCount || 0) + 1;
+      addMasteredWord(userId, word).catch(err =>
+        console.error('Error adding mastered word to DB:', err)
+      );
+    }
 
-      return newStats;
-    });
+    updateStats(newStats);
   };
 
   const renderScholarPath = () => {
@@ -408,34 +346,36 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
         handleGainExp(exp, 'hp');
         if (gold) {
           addGold(gold);
-          setStats(prev => ({ ...prev, gold: (prev.gold || 0) + gold }));
         }
       }} /></div>;
       case 'writing': return <div className="h-full"><WritingTraining onSuccess={(exp, gold) => {
         handleGainExp(exp, 'atk');
         if (gold) {
           addGold(gold);
-          setStats(prev => ({ ...prev, gold: (prev.gold || 0) + gold }));
         }
       }} /></div>;
       case 'listening': return <div className="h-full"><ListeningTraining onSuccess={(exp, gold) => {
         handleGainExp(exp, 'def');
         if (gold) {
           addGold(gold);
-          setStats(prev => ({ ...prev, gold: (prev.gold || 0) + gold }));
         }
       }} /></div>;
       case 'oral': return <div className="h-full"><OralTraining playerStats={stats} onSuccess={(exp, gold) => {
         handleGainExp(exp);
         if (gold) {
           addGold(gold);
-          setStats(prev => ({ ...prev, gold: (prev.gold || 0) + gold }));
         }
       }} /></div>;
       case 'pvp_blitz':
       case 'pvp_tactics':
         return <div className="h-full"><BattleArena mode={activeTab} playerStats={stats} onVictory={() => setActiveTab('vocab')} onDefeat={() => setActiveTab('vocab')} /></div>;
-      case 'admin': return <AdminPanel onUpdateStats={setStats} />;
+      case 'admin': return <AdminPanel onUpdateStats={(val) => {
+        if (typeof val === 'function') {
+          updateStats(val(stats));
+        } else {
+          updateStats(val);
+        }
+      }} />;
       default: return <VocabTraining onMastered={(word) => handleGainExp(1, 'atk')} />;
     }
   };
@@ -459,16 +399,16 @@ const AuthenticatedApp: React.FC<AuthenticatedAppProps> = ({ userId }) => {
             def: stats.def,
             hp: stats.maxHp,
             level: stats.level
-          }, getGearBonuses())}
+          })}
         />
       )}
 
       {/* Main Content Area */}
       <main className={`flex-1 overflow-y-auto px-4 custom-scrollbar relative transition-all duration-300 ${isArenaMenuOpen ? 'blur-sm scale-95 opacity-80 pointer-events-none select-none' : ''}`}>
         {kpNotification && (
-          <KPNotification 
-            kpGain={kpNotification.gain} 
-            promotion={kpNotification.promotion} 
+          <KPNotification
+            kpGain={kpNotification.gain}
+            promotion={kpNotification.promotion}
           />
         )}
         <AnimatePresence mode="wait">

@@ -135,7 +135,7 @@ export interface WarriorAppearance {
   modelColor?: string; // e.g. 'blue', 'red', 'yellow', 'purple', 'black'
 }
 
-export type ItemType = 'armor' | 'weapon';
+export type ItemType = 'armor' | 'weapon' | 'shield';
 
 export interface ShopItem {
   id: string;
@@ -153,9 +153,11 @@ export interface WarriorState {
   equipped: {
     armor: string | null;
     weapon: string | null;
+    shield: string | null;
   };
   appearance: WarriorAppearance;
   unlockedColors: string[]; // ['blue', 'red', etc.]
+  stats: UserStats;
 }
 
 export interface WritingMaterial {

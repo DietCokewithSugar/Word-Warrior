@@ -7,7 +7,7 @@ export const calculateKP = (stats: { atk: number; def: number; hp: number; level
   const totalAtk = stats.atk + gearBonus.atk;
   const totalDef = stats.def + gearBonus.def;
   const totalHp = stats.hp + gearBonus.hp;
-  
+
   return (totalAtk * 10) + (totalDef * 15) + (totalHp * 2) + (stats.level * 100);
 };
 
@@ -37,6 +37,7 @@ export const INITIAL_STATS = {
   winStreak: 0,
   masteredWordsCount: 0,
   loginDays: 1,
+  gold: 100,
 };
 
 export const NAVIGATION = [

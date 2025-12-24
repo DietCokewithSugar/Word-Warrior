@@ -1,18 +1,19 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { WarriorState, ShopItem } from '../types';
-import { SHOP_ITEMS } from '../constants.tsx';
+import { WarriorState, ShopItem, UserStats } from '../types';
+import { INITIAL_STATS } from '../constants.tsx';
 import { supabase } from '../services/supabaseClient';
-import { purchaseItem } from '../services/databaseService';
+import { purchaseItem, getShopItems, getUserEquipment, purchaseEquipment, getUserStats, updateUserStats, getUserInventory, equipItem as dbEquipItem } from '../services/databaseService';
 
 // Default State
 const DEFAULT_STATE: WarriorState = {
-    gold: 100, // Initial gold bonus
-    inventory: ['wpn_wood_sword', 'arm_leather'], // Starter items
+    gold: 100,
+    inventory: ['wpn_wood_sword', 'arm_leather'],
     equipped: {
         armor: 'arm_leather',
-        weapon: 'wpn_wood_sword'
+        weapon: 'wpn_wood_sword',
+        shield: null
     },
     appearance: {
         skinColor: '#f5d0b0',
@@ -22,16 +23,19 @@ const DEFAULT_STATE: WarriorState = {
         modelColor: 'blue' // Added for full body tint
     },
     unlockedColors: ['blue'], // Default unlocked color
+    stats: INITIAL_STATS
 };
 
 interface WarriorContextType {
     state: WarriorState;
     addGold: (amount: number) => void;
     buyItem: (itemId: string) => Promise<boolean>; // returns success
-    equipItem: (type: 'armor' | 'weapon', itemId: string) => void;
+    equipItem: (type: 'armor' | 'weapon' | 'shield', itemId: string) => void;
     updateAppearance: (updates: Partial<WarriorState['appearance']>) => void;
     getItemDetails: (itemId: string) => ShopItem | undefined;
     unlockColor: (colorId: string) => Promise<boolean>;
+    shopItems: ShopItem[];
+    updateStats: (updates: Partial<UserStats>) => void;
 }
 
 const WarriorContext = createContext<WarriorContextType | undefined>(undefined);
@@ -40,27 +44,80 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { user } = useAuth();
     const userId = user?.id;
 
+    // We keep shopItems in a separate state reference to avoid cluttering WarriorState if not needed, 
+    // but WarriorState is the main exposed object. Let's add shopItems to a separate context value? 
+    // Or just fetch them and keep them in a Ref or separate State. Use separate state for clarity.
+    const [shopItems, setShopItems] = useState<ShopItem[]>([]);
+
+    // Update DEFAULT_STATE to match new types
     const [state, setState] = useState<WarriorState>(DEFAULT_STATE);
     const [loaded, setLoaded] = useState(false);
 
-    // 1. Realtime Gold Sync
+    // DB Sync Debounce for Stats
+    useEffect(() => {
+        if (!userId || !loaded) return;
+
+        const timer = setTimeout(() => {
+            // We only push non-gold stats usually, but strict sync is okay if we are careful.
+            // However, gold is managed by RPC. So we should exclude gold from UPDATE calls to avoid race conditions.
+            const { gold, ...statsToSync } = state.stats;
+            updateUserStats(userId, statsToSync);
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, [state.stats, userId, loaded]);
+
+    // Initial Data Load
     useEffect(() => {
         if (!userId) return;
 
-        // Fetch initial gold separately to ensure it's authoritative
-        const fetchGold = async () => {
-            const { data } = await supabase
-                .from('user_stats')
-                .select('gold')
+        const initData = async () => {
+            // 1. Load Shop Items
+            const items = await getShopItems();
+            setShopItems(items);
+
+            // 2. Load User Stats (Full)
+            const dbStats = await getUserStats(userId);
+
+            // 3. Load Equipment
+            const equipment = await getUserEquipment(userId);
+
+            // 5. Load Inventory
+            const inventory = await getUserInventory(userId);
+
+            // 6. Load Settings (Avatar)
+            const { data: settingsData } = await supabase
+                .from('user_settings')
+                .select('avatar_color')
                 .eq('user_id', userId)
                 .single();
-            if (data && data.gold !== undefined) {
-                setState(prev => ({ ...prev, gold: data.gold }));
-            }
-        };
-        fetchGold();
 
-        // Subscribe to changes in user_stats for this user
+            // Construct new state
+            setState(prev => {
+                const newEquipped = {
+                    weapon: equipment?.weapon || null,
+                    shield: equipment?.shield || null,
+                    armor: equipment?.armor || null
+                };
+
+                return {
+                    ...prev,
+                    gold: dbStats?.gold ?? prev.gold,
+                    stats: dbStats ? { ...INITIAL_STATS, ...dbStats } : prev.stats,
+                    equipped: newEquipped,
+                    inventory: inventory, // Inventory from DB
+                    appearance: {
+                        ...prev.appearance,
+                        modelColor: settingsData?.avatar_color || prev.appearance.modelColor
+                    }
+                };
+            });
+
+            setLoaded(true);
+        };
+
+        initData();
+
+        // Realtime Subscription
         const channel = supabase
             .channel(`public:user_stats:user_id=eq.${userId}`)
             .on('postgres_changes', {
@@ -69,9 +126,12 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 table: 'user_stats',
                 filter: `user_id=eq.${userId}`
             }, (payload) => {
-                if (payload.new && payload.new.gold !== undefined) {
-                    console.log('💰 Gold updated via Realtime:', payload.new.gold);
-                    setState(prev => ({ ...prev, gold: payload.new.gold }));
+                if (payload.new) {
+                    setState(prev => ({
+                        ...prev,
+                        gold: payload.new.gold,
+                        stats: { ...prev.stats, ...payload.new }
+                    }));
                 }
             })
             .subscribe();
@@ -81,120 +141,66 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
     }, [userId]);
 
-    // 2. Load other state on mount/user change (inventory, appearance etc)
-    useEffect(() => {
-        if (!userId) return;
-        const saved = localStorage.getItem(`ww_warrior_${userId}`);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                // Merge with default to ensure new fields (if schema changes) exist. 
-                // Deep merge appearance to avoid overwriting new sub-fields (like modelColor) with old object.
-                setState({
-                    ...DEFAULT_STATE,
-                    ...parsed,
-                    appearance: {
-                        ...DEFAULT_STATE.appearance,
-                        ...(parsed.appearance || {})
-                    },
-                    unlockedColors: parsed.unlockedColors || DEFAULT_STATE.unlockedColors
-                });
-            } catch (e) {
-                console.error("Failed to parse warrior state", e);
-            }
-        } else {
-            setState(DEFAULT_STATE);
-        }
-
-        // Fetch authoritative avatar color from DB
-        const syncSettings = async () => {
-            try {
-                const { data } = await supabase
-                    .from('user_settings')
-                    .select('avatar_color')
-                    .eq('user_id', userId)
-                    .single();
-
-                if (data?.avatar_color) {
-                    setState(prev => ({
-                        ...prev,
-                        appearance: {
-                            ...prev.appearance,
-                            modelColor: data.avatar_color
-                        }
-                    }));
-                }
-            } catch (err) {
-                console.error("Failed to sync user settings", err);
-            }
-        };
-
-        syncSettings();
-        setLoaded(true);
-    }, [userId]);
-
-    // Save state on change
-    useEffect(() => {
-        if (!userId || !loaded) return;
-        localStorage.setItem(`ww_warrior_${userId}`, JSON.stringify(state));
-    }, [state, userId, loaded]);
+    const updateStats = (updates: Partial<UserStats>) => {
+        setState(prev => ({
+            ...prev,
+            stats: { ...prev.stats, ...updates },
+            gold: updates.gold !== undefined ? updates.gold : prev.gold // Sync root gold
+        }));
+    };
 
     const addGold = async (amount: number) => {
-        setState(prev => ({ ...prev, gold: prev.gold + amount }));
-
+        // Optimistic
+        updateStats({ gold: state.stats.gold + amount });
         if (userId) {
-            const { error } = await supabase.rpc('increment_user_gold', {
-                x_user_id: userId,
-                x_amount: amount
-            });
-            if (error) console.error("Failed to sync gold to DB:", error);
+            await supabase.rpc('increment_user_gold', { x_user_id: userId, x_amount: amount });
         }
     };
 
     const buyItem = async (itemId: string): Promise<boolean> => {
-        if (state.inventory.includes(itemId)) return false; // Already owned
-
-        const item = SHOP_ITEMS.find(i => i.id === itemId);
+        const item = shopItems.find(i => i.id === itemId);
         if (!item) return false;
 
-        // Optimistic check (still useful for UI feedback before network request)
+        // Check Gold
         if (state.gold < item.price) return false;
 
         if (userId) {
-            // Server-side purchase
-            const { success, newGold, message } = await purchaseItem(userId, item.price);
-
-            if (success && newGold !== undefined) {
+            const result = await purchaseEquipment(userId, itemId);
+            if (result.success && result.newGold !== undefined) {
+                // Update local gold and inventory
                 setState(prev => ({
                     ...prev,
-                    gold: newGold,
-                    inventory: [...prev.inventory, itemId]
+                    gold: result.newGold!,
+                    inventory: [...prev.inventory, itemId],
+                    stats: { ...prev.stats, gold: result.newGold! }
                 }));
                 return true;
             } else {
-                console.error("Purchase failed:", message);
                 return false;
-            }
-        } else {
-            // Fallback for non-authenticated users (if any, though useAuth implies auth)
-            if (state.gold >= item.price) {
-                setState(prev => ({
-                    ...prev,
-                    gold: prev.gold - item.price,
-                    inventory: [...prev.inventory, itemId]
-                }));
-                return true;
             }
         }
         return false;
     };
 
-    const equipItem = (type: 'armor' | 'weapon', itemId: string) => {
-        if (!state.inventory.includes(itemId)) return;
-        setState(prev => ({
-            ...prev,
-            equipped: { ...prev.equipped, [type]: itemId }
-        }));
+    const equipItem = async (type: 'armor' | 'weapon' | 'shield', itemId: string) => {
+        if (!userId) return;
+
+        // Call DB
+        const result = await dbEquipItem(userId, itemId);
+        if (result.success) {
+            // Refresh Stats (including new Atk/Def/HP from DB)
+            const updatedStats = await getUserStats(userId);
+
+            // Optimistic update locally
+            setState(prev => {
+                const newEquipped = { ...prev.equipped, [type]: itemId };
+                return {
+                    ...prev,
+                    equipped: newEquipped,
+                    stats: updatedStats ? { ...INITIAL_STATS, ...updatedStats } : prev.stats
+                };
+            });
+        }
     };
 
     const updateAppearance = (updates: Partial<WarriorState['appearance']>) => {
@@ -202,45 +208,24 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...prev,
             appearance: { ...prev.appearance, ...updates }
         }));
-
-        // Sync modelColor to DB
         if (updates.modelColor && userId) {
-            supabase.from('user_settings')
-                .upsert({ user_id: userId, avatar_color: updates.modelColor }, { onConflict: 'user_id' })
-                .then(({ error }) => {
-                    if (error) console.error("Failed to save avatar color", error);
-                });
+            supabase.from('user_settings').upsert({ user_id: userId, avatar_color: updates.modelColor }, { onConflict: 'user_id' });
         }
     };
 
     const unlockColor = async (colorId: string): Promise<boolean> => {
-        if (state.unlockedColors.includes(colorId)) return true; // Already unlocked
-
+        if (state.unlockedColors.includes(colorId)) return true;
         const PRICE = 100;
-
-        // Optimistic check
         if (state.gold < PRICE) return false;
 
         if (userId) {
-            const { success, newGold, message } = await purchaseItem(userId, PRICE);
-            if (success && newGold !== undefined) {
+            const { success, newGold } = await purchaseItem(userId, PRICE); // Use generic purchase for colors
+            if (success) {
                 setState(prev => ({
                     ...prev,
-                    gold: newGold,
-                    unlockedColors: [...prev.unlockedColors, colorId]
-                }));
-                return true;
-            } else {
-                console.error("Unlock failed:", message);
-                return false;
-            }
-        } else {
-            // Fallback
-            if (state.gold >= PRICE) {
-                setState(prev => ({
-                    ...prev,
-                    gold: prev.gold - PRICE,
-                    unlockedColors: [...prev.unlockedColors, colorId]
+                    gold: newGold!,
+                    unlockedColors: [...prev.unlockedColors, colorId],
+                    stats: { ...prev.stats, gold: newGold! }
                 }));
                 return true;
             }
@@ -248,10 +233,10 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return false;
     };
 
-    const getItemDetails = (itemId: string) => SHOP_ITEMS.find(i => i.id === itemId);
+    const getItemDetails = (itemId: string) => shopItems.find(i => i.id === itemId);
 
     return (
-        <WarriorContext.Provider value={{ state, addGold, buyItem, equipItem, updateAppearance, getItemDetails, unlockColor }}>
+        <WarriorContext.Provider value={{ state, addGold, buyItem, equipItem, updateAppearance, getItemDetails, unlockColor, shopItems, updateStats }}>
             {children}
         </WarriorContext.Provider>
     );

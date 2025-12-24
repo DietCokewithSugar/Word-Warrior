@@ -11,23 +11,12 @@ interface ShopPanelProps {
 }
 
 const ShopPanel: React.FC<ShopPanelProps> = ({ onClose }) => {
-    const { state, buyItem, equipItem } = useWarrior();
-    const [filter, setFilter] = useState<'all' | 'weapon' | 'armor'>('all');
-    const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
+    const { state, buyItem, equipItem, shopItems } = useWarrior();
+    const [filter, setFilter] = useState<'all' | 'weapon' | 'armor' | 'shield'>('all');
 
-    const filteredItems = SHOP_ITEMS.filter(item => filter === 'all' || item.type === filter);
+    const filteredItems = shopItems.filter(item => filter === 'all' || item.type === filter);
 
-    const handleBuy = async (item: ShopItem) => {
-        const success = await buyItem(item.id);
-        if (success) {
-            // Auto equip? Maybe explicit equip is better.
-            // But let's show success message or interactions
-        }
-    };
 
-    const handleEquip = (item: ShopItem) => {
-        equipItem(item.type, item.id);
-    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -64,71 +53,130 @@ const ShopPanel: React.FC<ShopPanelProps> = ({ onClose }) => {
                         <button
                             onClick={() => setFilter('all')}
                             className={`p-3 rounded-xl transition-all ${filter === 'all' ? 'ww-btn ww-btn--accent' : 'ww-btn'}`}
+                            title="All Items"
                         >
                             <LayoutGridIcon size={20} />
                         </button>
                         <button
                             onClick={() => setFilter('weapon')}
                             className={`p-3 rounded-xl transition-all ${filter === 'weapon' ? 'ww-btn ww-btn--accent' : 'ww-btn'}`}
+                            title="Weapons"
                         >
                             <Sword size={20} />
                         </button>
                         <button
-                            onClick={() => setFilter('armor')}
-                            className={`p-3 rounded-xl transition-all ${filter === 'armor' ? 'ww-btn ww-btn--accent' : 'ww-btn'}`}
+                            onClick={() => setFilter('shield')}
+                            className={`p-3 rounded-xl transition-all ${filter === 'shield' ? 'ww-btn ww-btn--accent' : 'ww-btn'}`}
+                            title="Shields"
                         >
                             <Shield size={20} />
+                        </button>
+                        <button
+                            onClick={() => setFilter('armor')}
+                            className={`p-3 rounded-xl transition-all ${filter === 'armor' ? 'ww-btn ww-btn--accent' : 'ww-btn'}`}
+                            title="Armor"
+                        >
+                            <div className="relative">
+                                <Shield size={20} className="scale-x-75" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-1 h-3 bg-current rounded-full"></div>
+                                </div>
+                            </div>
                         </button>
                     </div>
 
                     {/* Item Grid */}
                     <div className="flex-1 overflow-y-auto p-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {filteredItems.map(item => {
                                 const isOwned = state.inventory.includes(item.id);
-                                const isEquipped = state.equipped.armor === item.id || state.equipped.weapon === item.id;
+                                const isEquipped = state.equipped.armor === item.id || state.equipped.weapon === item.id || state.equipped.shield === item.id;
                                 const canAfford = state.gold >= item.price;
+
+                                // Determine Stat Icon/Text
+                                let statLabel = '';
+                                if (item.statBonus.atk) statLabel = `+${item.statBonus.atk} ATK`;
+                                else if (item.statBonus.def) statLabel = `+${item.statBonus.def} DEF`;
+                                else if (item.statBonus.hp) statLabel = `+${item.statBonus.hp} HP`;
+
+                                const handleAction = async () => {
+                                    if (isEquipped) return;
+
+                                    if (isOwned) {
+                                        // Equip logic
+                                        await equipItem(item.type, item.id);
+                                    } else {
+                                        // Buy logic
+                                        if (!canAfford) {
+                                            alert("金币不足，无法购买");
+                                            return;
+                                        }
+
+                                        const success = await buyItem(item.id);
+                                        if (success) {
+                                            alert("购买成功");
+                                        } else {
+                                            alert("购买失败，请重试");
+                                        }
+                                    }
+                                };
 
                                 return (
                                     <motion.div
                                         key={item.id}
                                         whileHover={{ y: -2 }}
-                                        className={`relative p-4 rounded-2xl border-2 group ${isEquipped ? 'bg-[rgba(252,203,89,0.25)] border-[color:var(--ww-stroke)]' : isOwned ? 'bg-[rgba(255,255,255,0.25)] border-[color:var(--ww-stroke-soft)]' : 'bg-[rgba(255,255,255,0.12)] border-[color:var(--ww-stroke-soft)]'}`}
+                                        className={`relative p-4 rounded-2xl border-2 group flex flex-col ${isEquipped ? 'bg-[rgba(252,203,89,0.25)] border-[color:var(--ww-brand)]' : isOwned ? 'bg-[rgba(255,255,255,0.08)] border-[color:var(--ww-stroke)]' : 'bg-[rgba(255,255,255,0.03)] border-[color:var(--ww-stroke-soft)]'}`}
                                     >
                                         <div className="aspect-square mb-4 rounded-xl bg-[rgba(26,15,40,0.10)] flex items-center justify-center relative overflow-hidden border border-[color:var(--ww-stroke-soft)]">
-                                            {/* Placeholder for Phaser Asset preview - using icon for now */}
-                                            {item.type === 'weapon' ? <Sword size={32} className="text-[color:var(--ww-stroke)] transition-colors" /> : <Shield size={32} className="text-[color:var(--ww-stroke)] transition-colors" />}
+                                            {/* Icon Logic */}
+                                            {item.type === 'weapon' ? <Sword size={32} className="text-[color:var(--ww-stroke)]" /> :
+                                                item.type === 'shield' ? <Shield size={32} className="text-[color:var(--ww-stroke)]" /> :
+                                                    <div className="relative"><Shield size={32} className="scale-x-75 text-[color:var(--ww-stroke)]" /></div>}
 
                                             {isEquipped && (
-                                                <div className="absolute top-2 right-2 ww-pill ww-pill--accent text-[10px] font-black px-2 py-0.5 uppercase">
+                                                <div className="absolute top-2 right-2 ww-pill ww-pill--accent text-[10px] font-black px-2 py-0.5 uppercase z-10 shadow-sm">
                                                     Equipped
+                                                </div>
+                                            )}
+                                            {!isEquipped && isOwned && (
+                                                <div className="absolute top-2 right-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-black px-2 py-0.5 uppercase z-10">
+                                                    Owned
                                                 </div>
                                             )}
                                         </div>
 
-                                        <h3 className="font-black ww-ink text-sm">{item.name}</h3>
-                                        <div className="flex gap-2 text-[10px] ww-muted mt-1 uppercase tracking-wider mb-3">
-                                            {item.statBonus.atk && <span className="text-[color:var(--ww-stroke)]">+ {item.statBonus.atk} ATK</span>}
-                                            {item.statBonus.def && <span className="text-[color:var(--ww-stroke)]">+ {item.statBonus.def} DEF</span>}
+                                        <div className="flex-1">
+                                            <h3 className="font-black ww-ink text-sm leading-tight mb-1">{item.name}</h3>
+                                            <div className="inline-block px-1.5 py-0.5 rounded bg-[color:var(--ww-stroke-soft)]/20 text-[10px] ww-muted font-bold uppercase mb-3">
+                                                {statLabel}
+                                            </div>
                                         </div>
 
-                                        {isOwned ? (
-                                            <button
-                                                onClick={() => handleEquip(item)}
-                                                disabled={isEquipped}
-                                                className={`w-full py-2 rounded-lg text-xs transition-colors ${isEquipped ? 'ww-btn ww-btn--ink opacity-70 cursor-default' : 'ww-btn ww-btn--accent'}`}
-                                            >
-                                                {isEquipped ? '已装备' : '装备'}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => handleBuy(item)}
-                                                disabled={!canAfford}
-                                                className={`w-full py-2 rounded-lg text-xs flex items-center justify-center gap-1 transition-colors ${canAfford ? 'ww-btn ww-btn--accent' : 'ww-btn ww-btn--ink cursor-not-allowed'}`}
-                                            >
-                                                {item.price} G
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={handleAction}
+                                            disabled={isEquipped}
+                                            className={`
+                                                w-full py-2 rounded-lg text-xs flex items-center justify-center gap-1 transition-all mt-auto font-black uppercase tracking-wide
+                                                ${isEquipped
+                                                    ? 'bg-transparent text-[color:var(--ww-muted)] cursor-default border-2 border-transparent'
+                                                    : isOwned
+                                                        ? 'bg-[color:var(--ww-brand)] text-black shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98]'
+                                                        : canAfford
+                                                            ? 'ww-btn ww-btn--ink hover:bg-[color:var(--ww-ink)] hover:text-white'
+                                                            : 'bg-white/5 text-white/40 hover:bg-white/10'} 
+                                            `}
+                                        >
+                                            {isEquipped ? (
+                                                <span>已装备</span>
+                                            ) : isOwned ? (
+                                                <span>装备</span>
+                                            ) : (
+                                                <div className="flex items-center gap-1">
+                                                    <span>{item.price}</span>
+                                                    <Coins size={12} />
+                                                </div>
+                                            )}
+                                        </button>
                                     </motion.div>
                                 );
                             })}

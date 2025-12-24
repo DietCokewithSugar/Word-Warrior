@@ -429,26 +429,65 @@ const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
 
   if (mode === 'summary') {
     const percentage = Math.round((score / batch.length) * 100);
+    const isPerfect = percentage === 100;
+
     return (
-      <div className="w-full h-full min-h-[500px] flex flex-col items-center justify-center text-center space-y-8 px-6">
-        <div className="relative">
-          <div className="absolute inset-0 bg-indigo-500 blur-[60px] opacity-20 animate-pulse rounded-full" />
-          <div className="relative border-4 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-full p-12 shadow-2xl">
-            <span className="text-6xl font-black text-indigo-500">{percentage}%</span>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="text-3xl font-black rpg-font dark:text-white text-slate-900">Session Complete</h2>
-          <p className="text-slate-400 font-bold">You mastered {score} out of {batch.length} words!</p>
-        </div>
-
-        <button
-          onClick={loadBatch}
-          className="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-black uppercase tracking-widest text-xs transition-all transform active:scale-95 shadow-xl shadow-indigo-500/20 flex items-center gap-2"
+      <div className="w-full h-full min-h-[500px] flex flex-col items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="w-full max-w-md ww-surface ww-surface--soft rounded-[32px] p-8 md:p-12 flex flex-col items-center text-center relative overflow-hidden"
+          style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.2), 0 0 0 4px rgba(255,255,255,0.1)' }}
         >
-          <RotateCcw size={16} /> Start Next Batch
-        </button>
+          {/* Background Decorative Element */}
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50" />
+
+          <div className="relative mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', damping: 12, delay: 0.2 }}
+              className="w-32 h-32 md:w-40 md:h-32 rounded-full flex items-center justify-center relative z-10"
+              style={{
+                background: isPerfect ? 'var(--ww-accent)' : 'rgba(255,255,255,0.9)',
+                border: '6px solid var(--ww-stroke)',
+                boxShadow: '0 12px 0 rgba(0,0,0,0.2)'
+              }}
+            >
+              <span className={`text-4xl md:text-5xl font-black tabular-nums ${isPerfect ? 'text-white' : 'ww-ink'}`}>
+                {percentage}%
+              </span>
+            </motion.div>
+            {/* Glow Effect */}
+            <div className={`absolute inset-0 blur-[40px] opacity-30 rounded-full ${isPerfect ? 'bg-yellow-400' : 'bg-indigo-500'}`} />
+          </div>
+
+          <div className="space-y-3 mb-10">
+            <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tight ww-ink italic">
+              {isPerfect ? '完美达成！' : '训练完成'}
+            </h2>
+            <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-black/5">
+              <Target size={18} className="text-indigo-500" />
+              <p className="text-sm md:text-base font-bold ww-muted">
+                你掌握了 <span className="ww-ink font-black text-xl">{score}</span> / {batch.length} 个单词
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full space-y-4">
+            <button
+              onClick={loadBatch}
+              className="ww-btn ww-btn--accent w-full py-5 rounded-2xl flex items-center justify-center gap-3 group"
+            >
+              <RotateCcw size={20} className="group-active:rotate-180 transition-transform duration-500" />
+              <span className="text-[13px] font-black uppercase tracking-[0.2em]">开始下一组</span>
+            </button>
+
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] ww-muted opacity-50">
+              学习即是修行 · 步履不停
+            </p>
+          </div>
+        </motion.div>
       </div>
     );
   }

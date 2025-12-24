@@ -221,10 +221,11 @@ const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [score, setScore] = useState(0);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
 
   // Persistence logic
   useEffect(() => {
-    if (user?.id && mode !== 'loading' && mode !== 'summary') {
+    if (user?.id && user.id === loadedUserId && mode !== 'loading' && mode !== 'summary') {
       const session = {
         mode,
         batch,
@@ -238,7 +239,7 @@ const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
     if (mode === 'summary') {
       localStorage.removeItem(STORAGE_KEY);
     }
-  }, [mode, batch, currentIndex, quizQuestions, score, user?.id]);
+  }, [mode, batch, currentIndex, quizQuestions, score, user?.id, loadedUserId]);
 
   const progress = useMemo(() => {
     if (mode === 'learning') {

@@ -109,6 +109,9 @@
 ### 2025-12-24 UX 与稳定性增强
 - **身份验证升级**:
     - 增加了 **GitHub OAuth 登录** 支持，用户可以直接通过 GitHub 账号授权进入游戏。
+- **AI 批改能力强化**:
+    - 将 **写作工坊** 的底座模型切换至 OpenRouter 的 `bytedance-seed/seed-1.6-flash`。
+    - 开启了 **推理能力 (Reasoning)**，使 AI 能够针对学术英语写作提供更深度的逻辑分析与修辞建议。
 - **阅读理解体验优化**:
     - 实现了答题后的 **自动平滑滚动**，用户选择选项后自动定位到下一题。
     - 增加了文章切换时的 **强制置顶逻辑**，确保进入新文章时视图位于顶部。
@@ -124,12 +127,16 @@
 
 ### A. OpenRouter API 使用情况
 - **调用位置**: `services/speakingAssessmentService.ts`
-- **应用场景**: **口语修行 - AI评估**。用于对玩家录制的语音进行发音、流利度、词汇和内容的综合评分。
+- **应用场景**: 
+    - **口语修行 - AI评估**。用于对玩家录制的语音进行发音、流利度、词汇和内容的综合评分。
+    - **写作工坊 - AI批改**。在 `gradeWriting` 中使用 `bytedance-seed/seed-1.6-flash` 模型对作文进行多维度评分及反馈。
 - **调用方式**: 
-    - 使用 `@openrouter/sdk`。
+    - 使用原生 `fetch` 或 `@openrouter/sdk`。
     - 认证方式：通过环境变量 `VITE_OPENROUTER_API_KEY`。
-    - 模型：`google/gemini-2.5-flash`。
-    - 交互细节：通过 `openRouter.chat.send` 发送多模态消息，包含文本 Prompt 和 Base64 编码的 `input_audio` 数据（WAV 格式）。强制要求 AI 以特定的 JSON 结构返回评分和反馈。
+    - 模型：`google/gemini-2.5-flash` (口语) 和 `bytedance-seed/seed-1.6-flash` (写作)。
+    - 交互细节：
+        - 写作批改开启了 `reasoning: { enabled: true }`，利用 Seed 模型的推理能力提供更深度的批改反馈。
+        - 强制要求 AI 以 JSON 结构返回评分数据。
 
 ### B. Gemini API (原生 SDK) 使用情况
 - **调用位置**: `services/geminiService.ts` 和 `services/liveService.ts`

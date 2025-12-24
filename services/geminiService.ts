@@ -4,34 +4,46 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 // Use process.env.API_KEY directly as per SDK guidelines
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
+
 export const gradeWriting = async (topic: string, content: string, difficulty: string) => {
-  const ai = getAI();
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `Please grade this English writing task based on grammar, vocabulary, and content.
+  const prompt = `Please grade this English writing task based on grammar, vocabulary, and content.
     Topic: ${topic}
     Difficulty Level: ${difficulty}
-    Student Content: ${content}`,
-    config: {
-      systemInstruction: "你是一位资深的雅思/托福英语老师。请根据题目难度（小学/初中/高中）对文章进行评分。返回一个 JSON 对象，包含：\n- score_total (0-100)\n- score_vocab (0-100)\n- score_grammar (0-100)\n- score_content (0-100)\n- feedback (中文总评)\n- suggestions (改进建议数组，中文)",
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          score_total: { type: Type.NUMBER },
-          score_vocab: { type: Type.NUMBER },
-          score_grammar: { type: Type.NUMBER },
-          score_content: { type: Type.NUMBER },
-          feedback: { type: Type.STRING },
-          suggestions: { type: Type.ARRAY, items: { type: Type.STRING } }
-        },
-        required: ["score_total", "score_vocab", "score_grammar", "score_content", "feedback", "suggestions"]
-      }
-    }
-  });
+    Student Content: ${content}
+    
+    你是一位资深的雅思/托福英语老师。请根据题目难度（小学/初中/高中）对文章进行评分。返回一个 JSON 对象，包含：
+    - score_total (0-100)
+    - score_vocab (0-100)
+    - score_grammar (0-100)
+    - score_content (0-100)
+    - feedback (中文总评)
+    - suggestions (改进建议数组，中文)`;
 
   try {
-    const raw = JSON.parse(response.text);
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "bytedance-seed/seed-1.6-flash",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        reasoning: { enabled: true }
+      })
+    });
+
+    const data = await response.json();
+    const resultText = data.choices[0].message.content;
+    const raw = JSON.parse(resultText);
+
     // Map raw response to WritingResult structure
     return {
       score: {
@@ -41,10 +53,11 @@ export const gradeWriting = async (topic: string, content: string, difficulty: s
         content: raw.score_content
       },
       feedback: raw.feedback,
-      corrections: raw.suggestions
+      corrections: raw.suggestions,
+      reasoning: data.choices[0].message.reasoning_details // Optional: capture reasoning if needed elsewhere
     };
   } catch (e) {
-    console.error("Error parsing Gemini response", e);
+    console.error("Error calling OpenRouter for writing grade", e);
     return {
       score: {
         total: 0,

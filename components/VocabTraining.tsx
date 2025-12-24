@@ -206,6 +206,8 @@ const QuizCard: React.FC<QuizCardProps> = ({ question, onAnswer, questionIndex, 
 // MAIN COMPONENT
 // ==========================================
 
+const STORAGE_KEY = 'ww_vocab_session';
+
 interface VocabTrainingProps {
   onMastered: (word: string) => void;
 }
@@ -219,6 +221,24 @@ const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [score, setScore] = useState(0);
+
+  // Persistence logic
+  useEffect(() => {
+    if (mode !== 'loading' && mode !== 'summary') {
+      const session = {
+        mode,
+        batch,
+        currentIndex,
+        quizQuestions,
+        score,
+        userId: user?.id
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    }
+    if (mode === 'summary') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [mode, batch, currentIndex, quizQuestions, score, user?.id]);
 
   const progress = useMemo(() => {
     if (mode === 'learning') {
@@ -251,9 +271,31 @@ const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
 
   // Load Batch
   useEffect(() => {
-    if (user) {
-      loadBatch();
-    }
+    const init = async () => {
+      if (!user) return;
+
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const session = JSON.parse(saved);
+          if (session.userId === user.id && session.batch.length > 0) {
+            console.log('📦 Restoring saved session...');
+            setBatch(session.batch);
+            setQuizQuestions(session.quizQuestions);
+            setCurrentIndex(session.currentIndex);
+            setScore(session.score);
+            setMode(session.mode);
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to restore session:', e);
+        }
+      }
+      
+      await loadBatch();
+    };
+
+    init();
   }, [user]);
 
   const loadBatch = async () => {
@@ -270,10 +312,11 @@ const VocabTraining: React.FC<VocabTrainingProps> = ({ onMastered }) => {
       }
       setBatch(words);
       setCurrentIndex(0);
-      setMode('learning');
-
+      setScore(0);
+      
       // Pre-generate quiz for this batch
-      generateQuiz(words);
+      await generateQuiz(words);
+      setMode('learning');
     } catch (e) {
       console.error(e);
     }

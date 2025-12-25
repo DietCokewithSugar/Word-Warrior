@@ -174,6 +174,7 @@ const ReadingTraining: React.FC<ReadingTrainingProps> = ({ onSuccess, onToggleSt
         gold={goldEarned}
         isVisible={showXPNotification}
         onClose={() => setShowXPNotification(false)}
+        title="阅读试炼奖励"
       />
     </div>
   );

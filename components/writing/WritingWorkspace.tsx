@@ -135,6 +135,7 @@ const WritingWorkspace: React.FC<WritingWorkspaceProps> = ({ material, onBack, o
                 gold={goldEarned}
                 isVisible={showXPNotification}
                 onClose={() => setShowXPNotification(false)}
+                title="写作工坊奖励"
             />
         </div>
     );

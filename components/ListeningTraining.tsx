@@ -163,6 +163,7 @@ const ListeningTraining: React.FC<ListeningTrainingProps> = ({ onSuccess, onTogg
         gold={goldEarned}
         isVisible={showXPNotification}
         onClose={() => setShowXPNotification(false)}
+        title="听力磨炼奖励"
       />
     </div>
   );

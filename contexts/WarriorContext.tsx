@@ -79,6 +79,8 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (!userId) return;
 
         const initData = async () => {
+            const startTime = Date.now();
+            
             // 1. Load Shop Items
             const items = await getShopItems();
             setShopItems(items);
@@ -119,6 +121,15 @@ export const WarriorProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     }
                 };
             });
+
+            // 强制最少显示加载屏 800ms，确保平滑过渡
+            const endTime = Date.now();
+            const elapsed = endTime - startTime;
+            const minDuration = 800; 
+            
+            if (elapsed < minDuration) {
+                await new Promise(resolve => setTimeout(resolve, minDuration - elapsed));
+            }
 
             setLoaded(true);
         };

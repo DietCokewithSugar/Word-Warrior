@@ -1,10 +1,5 @@
 import { supabase } from './supabaseClient';
 import { SpeakingQuestion, SpeakingAssessment, AssessmentScore } from '../types';
-import { OpenRouter } from '@openrouter/sdk';
-
-const openRouter = new OpenRouter({
-    apiKey: import.meta.env.VITE_OPENROUTER_API_KEY ?? '',
-});
 
 /**
  * Fetch speaking questions from database with optional filters
@@ -119,7 +114,7 @@ export async function audioBlobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Call OpenRouter API with Gemini 2.5 Flash to assess speaking
+ * Call OpenRouter API with Gemini to assess speaking
  */
 export async function assessSpeakingWithAI(
     audioBase64: string,
@@ -155,47 +150,69 @@ export async function assessSpeakingWithAI(
   "feedback_text": "文字反馈"
 }`;
 
-        const result = await openRouter.chat.send({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-                {
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'text',
-                            text: prompt,
-                        },
-                        {
-                            type: 'input_audio',
-                            inputAudio: {
-                                data: audioBase64,
-                                format: 'wav',
+        // Using standard fetch to OpenRouter for better control and multimodal support
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://word-warrior.com",
+                "X-Title": "Word Warrior"
+            },
+            body: JSON.stringify({
+                model: 'google/gemini-2.0-flash-001', // Using a stable model name that supports audio
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: prompt,
                             },
-                        },
-                    ] as any,
-                },
-            ],
-        } as any);
+                            {
+                                type: 'input_audio',
+                                input_audio: {
+                                    data: audioBase64,
+                                    format: 'wav',
+                                },
+                            },
+                        ],
+                    },
+                ],
+                response_format: { type: 'json_object' }
+            }),
+        });
 
-        const responseText = result.choices?.[0]?.message?.content || '';
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('OpenRouter API Error:', errorData);
+            throw new Error(`API错误: ${response.status}`);
+        }
 
-        // Handle content that might be an array or string
-        const contentText = typeof responseText === 'string'
-            ? responseText
-            : Array.isArray(responseText)
-                ? (responseText.find((item: any) => item.type === 'text') as any)?.text || JSON.stringify(responseText)
-                : String(responseText);
+        const result = await response.json();
+        const contentText = result.choices?.[0]?.message?.content || '';
+
+        if (!contentText) {
+            throw new Error('AI返回了空内容');
+        }
 
         // Parse the JSON response
-        const jsonMatch = contentText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
+        let assessment: AssessmentScore;
+        try {
+            // Find JSON block if it's wrapped in markdown
+            const jsonMatch = contentText.match(/\{[\s\S]*\}/);
+            const jsonStr = jsonMatch ? jsonMatch[0] : contentText;
+            assessment = JSON.parse(jsonStr);
+        } catch (e) {
+            console.error('Failed to parse AI response:', contentText);
             throw new Error('AI返回的格式不正确');
         }
 
-        const assessment = JSON.parse(jsonMatch[0]) as AssessmentScore;
-
         // Validate scores are within range
-        const validateScore = (score: number) => Math.max(0, Math.min(100, score));
+        const validateScore = (score: any) => {
+            const n = Number(score);
+            return isNaN(n) ? 0 : Math.max(0, Math.min(100, n));
+        };
 
         return {
             pronunciation_score: validateScore(assessment.pronunciation_score),
@@ -204,12 +221,12 @@ export async function assessSpeakingWithAI(
             content_score: validateScore(assessment.content_score),
             on_topic_score: validateScore(assessment.on_topic_score),
             total_score: validateScore(assessment.total_score),
-            sentence_count: assessment.sentence_count || 0,
+            sentence_count: Number(assessment.sentence_count) || 0,
             feedback_text: assessment.feedback_text || '评估完成。',
         };
     } catch (error) {
         console.error('Error assessing speaking with AI:', error);
-        throw new Error('AI评估失败，请重试');
+        throw error; // Rethrow to show original error message if possible
     }
 }
 
